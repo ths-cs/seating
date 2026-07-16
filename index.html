@@ -1328,67 +1328,62 @@ function reframeForPresentation(){
   });
 
 document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
-  if (!state.desks || state.desks.length === 0) {
-    alert("There are no desks to export!");
-    return;
-  }
-
-  // 1. Get the current active class name dynamically
-  // If somehow empty, fall back to a generic name
-  const rawClassName = state.currentClass || "Classroom";
-
-  // 2. Sanitize the class name for LanSchool's ClassID 
-  // (e.g., "p3: HSB27" becomes "p3_HSB27" by replacing colons/spaces with underscores)
-  const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
-
-  // LanSchool Enhanced Display Format
-  const csvRows = [
-    ['ClassID', 'Student Name', 'Machine Name'] 
-  ];
-
-  // 3. Loop through your desks and pull assigned student information
-  state.desks.forEach((desk, index) => {
-    // Correctly fetch the student object from your active roster using studentId
-    const student = desk.studentId ? studentById(desk.studentId) : null;
-    
-    if (student && student.name) {
-      // Find the computer machine name from your mapping
-      // If none is found, we fall back to a clean placeholder
-      const deskNum = index + 1;
-      const match = machineMapping.find(m => m.deskNumber === deskNum);
-      const machineName = match ? match.machineName : `DESK-${deskNum}`;
-      
-      csvRows.push([
-        classId,
-        student.name.trim(),
-        machineName.trim()
-      ]);
+    if (!state.desks || state.desks.length === 0) {
+      alert("There are no desks to export!");
+      return;
     }
+
+    const rawClassName = state.currentClass || "Classroom";
+    const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
+
+    // 1. Start the native LanSchool Class List (.lsc) file structure
+    const lscLines = [
+      '[LanSchool Class List]'
+    ];
+
+    let studentIndex = 0;
+
+    // 2. Loop through and map assigned student names to physical machine names
+    state.desks.forEach((desk, index) => {
+      const student = desk.studentId ? studentById(desk.studentId) : null;
+      
+      if (student && student.name) {
+        const deskNum = index + 1;
+        const match = machineMapping.find(m => m.deskNumber === deskNum);
+        
+        if (match && match.machineName) {
+          const studentName = student.name.trim().toUpperCase();
+          const machineName = match.machineName.trim().toUpperCase();
+
+          // LanSchool expects: Student_0=STUDENT NAME=COMPUTER_NAME
+          lscLines.push(`Student_${studentIndex}=${studentName}=${machineName}`);
+          studentIndex++;
+        }
+      }
+    });
+
+    if (studentIndex === 0) {
+      alert("No students are currently assigned to any desks!");
+      return;
+    }
+
+    // 3. Type=2 specifies "Student Machine Name" matching in LanSchool
+    lscLines.push('Type=2');
+
+    // Join with standard Windows line endings
+    const lscContent = lscLines.join("\r\n");
+
+    // 4. Trigger download with the native .lsc extension
+    const blob = new Blob([lscContent], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${classId}.lsc`);
+    document.body.appendChild(link);
+    
+    link.click();
+    document.body.removeChild(link);
   });
-
-  if (csvRows.length <= 1) {
-    alert("No students are currently assigned to any desks!");
-    return;
-  }
-
-  // Convert array to CSV string
-  const csvContent = csvRows
-    .map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(","))
-    .join("\r\n");
-
-  // Trigger browser file download named after your current class
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  
-  // Saves the file cleanly as "p3_HSB27_lanschool.csv"
-  link.setAttribute("download", `${classId}_lanschool.csv`);
-  document.body.appendChild(link);
-  
-  link.click();
-  document.body.removeChild(link);
-});
 
   // Export Setup
   function generateConfigCode(){
