@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seating Chart</title>
+<style>
+  /* 1. Isolated, dedicated load just for Caveat to prevent parsing drops */
+  @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
+  
+  /* 2. Your remaining utility fonts */
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  --blueprint-bg: #121212;      /* Black — canvas background */
+  --blueprint-line: #333333;    /* Dark Gray — minor grid lines */
+  --blueprint-line-strong: #707070; /* Medium Gray — major grid lines & desk borders */
+  --paper: #D9D9D9;             /* Light Gray — nameplate/card background */
+  --paper-shadow: rgba(0,0,0,0.35);
+  --ink: #121212;               /* Black — text on light backgrounds */
+  --accent: #9E1B32;            /* Crimson — primary actions & highlights */
+  --accent-dark: #7A1527;       /* Darker crimson — hover state */
+  --danger: #7A1527;            /* Darker crimson — remove/unassign actions */
+  --panel-bg: #333333;          /* Dark Gray — header/toolbar/sidebar */
+  --panel-border: #707070;      /* Medium Gray — borders */
+  --text-light: #EDEDED;        /* Near-white — text on dark backgrounds */
+  --text-muted: #A8A8A8;        /* Medium-light gray — secondary text */
+}
+
+  * { box-sizing: border-box; }
+  html,body { height:100%; }
+  body{
+    margin:0;
+    font-family:'IBM Plex Sans', sans-serif;
+    background: var(--panel-bg);
+    color: var(--text-light);
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  button{ font-family: inherit; }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .app{ display:flex; flex-direction:column; height:100%; }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 20px;
+    background: var(--panel-bg);
+    border-bottom:1px solid var(--panel-border);
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:50%;
+    border:2px solid var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* color: var(--accent); */
+    flex-shrink:0;
+    line-height: 1; /* Prevents the vertical font leading from pushing it down */
+  }
+  .brand h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:24px; font-weight:700; letter-spacing:.01em;
+    margin:0; color:var(--text-light);
+  }
+  .class-controls{ display:flex; align-items:center; gap:8px; }
+  select#classSelect{
+    background: var(--panel-bg);
+    color: var(--text-light);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:8px 10px;
+    font-size:14px;
+    font-family:'IBM Plex Sans',sans-serif;
+    max-width:180px;
+  }
+
+  .btn{
+    background: var(--panel-bg);
+    color: var(--text-light);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:8px 12px;
+    font-size:13px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .btn:hover{ border-color: var(--accent); }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color:#FFFFFF; font-weight:600; }
+  .btn.primary:hover{ background: var(--accent-dark); border-color: var(--accent-dark); }
+  .btn.danger{ color:#FFD9CC; }
+  .btn.danger:hover{ border-color: var(--danger); }
+  .btn.active{ background: var(--accent); border-color: var(--accent); color: #FFF; }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding: 10px 20px;
+    background: var(--panel-bg);
+    border-bottom:1px solid var(--panel-border);
+  }
+  .toolbar .spacer{ flex:1; }
+  .deskCount{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color: var(--text-muted);
+    letter-spacing:.02em;
+  }
+
+  /* ---------- Workspace ---------- */
+  .workspace{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+  .canvas-wrap{
+    flex:1;
+    overflow:auto;
+    position:relative;
+  }
+  .canvas{
+    position:relative;
+    min-width:1650px;
+    min-height:950px;
+    width:max-content;
+    transition: transform 0.25s ease;
+    background-color: var(--blueprint-bg);
+    background-image:
+      linear-gradient(var(--blueprint-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px),
+      linear-gradient(var(--blueprint-line-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--blueprint-line-strong) 1px, transparent 1px);
+    background-size: 25px 25px, 25px 25px, 100px 100px, 100px 100px;
+  }
+  .canvas-empty-msg{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    color: var(--blueprint-line-strong);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    text-align:center;
+    border:1px dashed var(--blueprint-line-strong);
+    padding:18px 26px;
+    border-radius:6px;
+    pointer-events:none;
+  }
+
+  /* ---------- Desks ---------- */
+  .desk{
+    position:absolute;
+    width:130px;
+    height:84px;
+  }
+  .desk-number{
+    position:absolute; top:-9px; left:-9px;
+    width:24px; height:24px;
+    border-radius:50%;
+    background: var(--accent);
+    color:#FFFFFF;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+    font-size:11.5px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 4px rgba(0,0,0,.35);
+    z-index:2;
+    pointer-events:none;
+  }
+  .desk-handle{
+    height:18px;
+    background: var(--blueprint-line-strong);
+    border-radius:5px 5px 0 0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 5px;
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+  }
+  .desk-handle:active{ cursor:grabbing; }
+  .desk-dots{ color: rgba(255,255,255,0.6); font-size:11px; letter-spacing:1px; }
+  .desk-remove{
+    background:none; border:none; color: rgba(255,255,255,0.75);
+    font-size:14px; line-height:1; cursor:pointer; padding:0 2px;
+  }
+  .desk-remove:hover{ color:#fff; }
+  .desk-body{
+    height:66px;
+    border:2px dashed var(--blueprint-line-strong);
+    border-top:none;
+    border-radius:0 0 5px 5px;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,0.03);
+    transition: background .12s ease, border-color .12s ease;
+  }
+  .desk-body.drag-over{
+    background: rgba(232,163,61,0.18);
+    border-color: var(--accent);
+  }
+  .desk-empty-label{
+    color: var(--blueprint-line-strong);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:.03em;
+    text-align:center;
+    padding:0 8px;
+  }
+  .nameplate{
+    width:112px; height:56px;
+    background: var(--paper);
+    border-radius:4px;
+    box-shadow:0 3px 6px var(--paper-shadow);
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+    cursor:grab;
+    font-family: 'Caveat', cursive, sans-serif;
+    font-size:20px;
+    font-weight:700;
+    color: var(--ink);
+    text-align:center;
+    line-height:1.05;
+    padding:2px 6px;
+  }
+  .nameplate:active{ cursor:grabbing; }
+  .nameplate::before{
+    content:'';
+    position:absolute; top:-5px; left:50%; transform:translateX(-50%);
+    width:8px; height:8px; border-radius:50%;
+    background: var(--accent);
+    box-shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+  .nameplate .unassign{
+    position:absolute; top:-7px; right:-7px;
+    width:17px; height:17px; border-radius:50%;
+    background: var(--danger); color:#fff; border:2px solid var(--panel-bg);
+    font-size:11px; line-height:1; cursor:pointer; padding:0;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+
+  /* ---------- Title block ---------- */
+  .title-block{
+    position:absolute; bottom:16px; right:16px;
+    background: rgba(217,217,217,0.95);
+    border:1px solid var(--blueprint-line-strong);
+    border-radius:4px;
+    padding:8px 12px;
+    min-width:170px;
+    transition: all 0.2s ease-in-out;
+    z-index: 10;
+  }
+  .tb-row{ display:flex; justify-content:space-between; gap:14px; font-size:12px; padding:2px 0; }
+  .tb-label{
+    font-family:'IBM Plex Mono', monospace;
+    color:#5a5a5a;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    font-size:10px;
+    align-self:center;
+  }
+  .tb-row span:last-child{ color: var(--ink); font-weight:600; }
+
+  /* ---------- Roster panel ---------- */
+  .roster-panel{
+    width:230px;
+    flex-shrink:0;
+    background: var(--panel-bg);
+    border-left:1px solid var(--panel-border);
+    padding:16px;
+    overflow-y:auto;
+    transition: margin-right 0.2s ease;
+  }
+  .roster-panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14px;
+    margin:0 0 12px 0;
+    color: var(--text-light);
+    display:flex; align-items:center; gap:6px;
+  }
+  #unassignedCount{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color: var(--text-muted);
+    font-weight:400;
+  }
+  .roster-list{
+    min-height:60px;
+    border-radius:6px;
+    padding:4px;
+    transition: background .12s ease;
+  }
+  .roster-list.drag-over{ background: rgba(232,163,61,0.12); }
+  .roster-chip{
+    background: var(--paper);
+    color: var(--ink);
+    padding:8px 10px;
+    border-radius:5px;
+    margin-bottom:7px;
+    font-size:14px;
+    cursor:grab;
+    box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .roster-chip:active{ cursor:grabbing; }
+  .roster-empty{
+    color: var(--text-muted);
+    font-size:12.5px;
+    font-style:italic;
+    padding:8px 4px;
+  }
+
+/* ---------- FULLSCREEN/PRESENTATION MODE OVERRIDES ---------- */
+  .app.presentation-mode .topbar,
+  .app.presentation-mode .toolbar,
+  .app.presentation-mode .roster-panel {
+    display: none !important;
+  }
+  .app.presentation-mode .workspace {
+    position: relative;
+    flex-direction: column; /* Stacks the dashboard bar on top of the canvas */
+  }
+  
+  /* Transform the title-block into a clean top dashboard bar */
+  .app.presentation-mode .title-block {
+    position: sticky; /* Switched from fixed to sticky to naturally push content down */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    border-radius: 0;
+    border: none;
+    border-bottom: 2px solid var(--blueprint-line-strong);
+    background: var(--paper);
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    gap: 40px;
+    z-index: 100; /* Stays firmly on top during scroll/zooms */
+  }
+  
+  .app.presentation-mode .title-block .tb-row {
+    font-size: 15px;
+    gap: 8px;
+    padding: 0;
+  }
+  .app.presentation-mode .title-block .tb-label {
+    font-size: 11px;
+  }
+
+  /* Move the toggle view button dynamically into the title bar container */
+  .app.presentation-mode #toggleViewBtn {
+    margin-left: auto; /* Pushes the toggle button all the way to the right side */
+    background: var(--accent);
+    color: #FFF;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .app.presentation-mode #toggleViewBtn:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+  }
+  
+  .app.presentation-mode .canvas-wrap {
+    margin-top: 0;
+    overflow: hidden;
+    flex: 1;
+    background-color: var(--blueprint-bg); /* Matches the blueprint grid background */
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed; inset:0;
+    background: rgba(10,20,32,0.65);
+    align-items:center; justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal{
+    background: var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:22px;
+    width:100%; max-width:420px;
+  }
+  .modal h3{ margin:0 0 6px 0; font-family:'Space Grotesk',sans-serif; font-size:17px; }
+  .modal p{ margin:0 0 12px 0; font-size:13px; color: var(--text-muted); }
+  .modal textarea, .modal input[type="text"]{
+    width:100%;
+    background:#0F2438;
+    border:1px solid var(--panel-border);
+    color: var(--text-light);
+    border-radius:6px;
+    padding:10px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    resize:vertical;
+  }
+  .modal textarea{ min-height:160px; line-height:1.5; }
+  .modal select{
+    width:100%;
+    background:#0F2438;
+    border:1px solid var(--panel-border);
+    color: var(--text-light);
+    border-radius:6px;
+    padding:9px 10px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+  }
+  .modal .field-label{
+    display:block; margin:12px 0 6px; font-size:12px; color: var(--text-muted);
+  }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .dup-list{ display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; }
+  .dup-option{
+    display:flex; align-items:center; gap:8px;
+    background:#0F2438; border:1px solid var(--panel-border);
+    border-radius:6px; padding:8px 10px; font-size:14px; cursor:pointer;
+  }
+  .dup-option input{ cursor:pointer; }
+  .export-textarea{
+    width:100%; min-height:220px;
+    background:#0F2438;
+    border:1px solid var(--panel-border);
+    color: var(--text-light);
+    border-radius:6px;
+    padding:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    line-height:1.5;
+    white-space:pre;
+    resize:vertical;
+  }
+  .copy-status{
+    font-size:12px; color: var(--accent); margin-right:auto;
+    align-self:center;
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 760px){
+    .workspace{ flex-direction:column; }
+    .roster-panel{ width:auto; border-left:none; border-top:1px solid var(--panel-border); max-height:220px; }
+    .canvas-wrap{ height:60vh; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    * { transition:none !important; }
+  }
+
+  /* ---------- Print ---------- */
+  @media print{
+    :root{
+      --blueprint-bg:#ffffff;
+      --blueprint-line:#e2e2e2;
+      --blueprint-line-strong:#bcbcbc;
+      --paper:#ffffff;
+      --panel-bg:#ffffff;
+    }
+    body{ background:#fff; color:#111; overflow:visible; height:auto; }
+    .topbar .class-controls, .toolbar, .roster-panel{ display:none !important; }
+    .canvas-wrap{ overflow:visible; height:auto; }
+    .canvas{ min-width:0; width:100%; box-shadow:none; }
+    .desk-handle{ display:none; }
+    .desk-body{ border-color:#999; }
+    .nameplate{ box-shadow:none; border:1px solid #ccc; }
+    .nameplate .unassign{ display:none; }
+    .nameplate::before{ display:none; }
+    .title-block{ border-color:#999; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="appWrapper">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">☷</span>
+      <h1>306 Seating Chart</h1>
+    </div>
+    <div class="class-controls">
+      <select id="classSelect" aria-label="Select class"></select>
+      <button class="btn" id="newClassBtn">+ New Class</button>
+    </div>
+  </header>
+
+  <div class="toolbar" id="mainToolbar">
+    <button class="btn primary" id="addDeskBtn">+ Add Desk</button>
+    <button class="btn" id="shuffleBtn">Shuffle Seats</button>
+    <button class="btn" id="clearSeatsBtn">Clear Seats</button>
+    <button class="btn" id="importBtn">Import Roster</button>
+    <button class="btn" id="duplicateBtn">Duplicate Layout</button>
+    <button class="btn" id="exportBtn">Export Setup</button>
+    <button class="btn" id="printBtn">Print</button>
+    <button class="btn" id="exportLanSchoolBtn">💾 Export LanSchool Roster</button>
+    <button class="btn" id="toggleViewBtn">📺 Fullscreen View</button>
+    <div class="spacer"></div>
+    <span class="deskCount" id="deskCountLabel"></span>
+  </div>
+
+  <div class="workspace">
+    <div class="canvas-wrap">
+      <div class="canvas" id="canvas">
+      </div>
+      <div class="title-block" id="titleBlock">
+        <div class="tb-row"><span class="tb-label">Class</span><span id="tbClass">—</span></div>
+        <div class="tb-row"><span class="tb-label">Seated</span><span id="tbSeats">0 / 0</span></div>
+        <div class="tb-row"><span class="tb-label">Date</span><span id="tbDate">—</span></div>
+      </div>
+    </div>
+    <aside class="roster-panel">
+      <h2>Unassigned <span id="unassignedCount"></span></h2>
+      <div class="roster-list" id="rosterList"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- New Class Modal -->
+<div class="modal-overlay" id="newClassModal">
+  <div class="modal">
+    <h3>New Class</h3>
+    <p>Give this class or period a name.</p>
+    <input type="text" id="newClassInput" placeholder="e.g. Period 3 — Science">
+    <label class="field-label" for="copyLayoutSelect">Copy desk layout from</label>
+    <select id="copyLayoutSelect"></select>
+    <div class="modal-actions">
+      <button class="btn" id="newClassCancel">Cancel</button>
+      <button class="btn primary" id="newClassConfirm">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Roster Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <h3>Import Roster</h3>
+    <p>One student name per line. This replaces the current roster for this class — students removed here will be unseated.</p>
+    <textarea id="rosterTextarea" placeholder="Alicia Chen
+Marcus Reed
+Priya Nair
+..."></textarea>
+    <div class="modal-actions">
+      <button class="btn" id="importCancel">Cancel</button>
+      <button class="btn primary" id="importConfirm">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate Layout Modal -->
+<div class="modal-overlay" id="duplicateModal">
+  <div class="modal">
+    <h3>Duplicate Layout</h3>
+    <p>Copy this class's desk positions (empty of names) into other classes. This overwrites their current desk layout — their rosters and seat assignments are untouched.</p>
+    <div class="dup-list" id="duplicateClassList"></div>
+    <div class="modal-actions">
+      <button class="btn" id="duplicateCancel">Cancel</button>
+      <button class="btn primary" id="duplicateConfirm">Copy Layout</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Setup Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="max-width:560px;">
+    <h3>Export Setup</h3>
+    <p>Copy this and paste it in place of the <code>CLASS_DATA</code> object near the top of the file's &lt;script&gt; tag (look for the "YOUR CLASSES" comment). Save the file, and this layout and roster become the permanent starting point — no storage or hosting needed.</p>
+    <textarea class="export-textarea" id="exportOutput" readonly></textarea>
+    <div class="modal-actions">
+      <span class="copy-status" id="copyStatus"></span>
+      <button class="btn" id="exportClose">Close</button>
+      <button class="btn primary" id="exportCopy">Copy to Clipboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal (generic) -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmText"></p>
+    <div class="modal-actions">
+      <button class="btn" id="confirmCancel">Cancel</button>
+      <button class="btn danger" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const DESK_W = 130, DESK_H = 84;
+
+  // =====================================================================
+  // YOUR CLASSES — EDIT THIS SECTION TO PERMANENTLY SET YOUR LAYOUTS
+  // =====================================================================
+const CLASS_DATA = {
+  "p1: GA2": {
+    roster: [],
+    desks: [
+      { x: 1313, y: 690, student: null },
+      { x: 1171, y: 690, student: null },
+      { x: 1030, y: 690, student: null },
+      { x: 888, y: 690, student: null },
+      { x: 746, y: 690, student: null },
+      { x: 605, y: 690, student: null },
+      { x: 462, y: 690, student: null },
+      { x: 318, y: 690, student: null },
+      { x: 171, y: 690, student: null },
+      { x: 27, y: 688, student: null },
+      { x: 1160, y: 257, student: null },
+      { x: 1304, y: 257, student: null },
+      { x: 1159, y: 402, student: null },
+      { x: 1304, y: 402, student: null },
+      { x: 1160, y: 521, student: null },
+      { x: 920, y: 150, student: null },
+      { x: 920, y: 243, student: null },
+      { x: 920, y: 335, student: null },
+      { x: 920, y: 429, student: null },
+      { x: 920, y: 522, student: null },
+      { x: 700, y: 149, student: null },
+      { x: 700, y: 248, student: null },
+      { x: 700, y: 340, student: null },
+      { x: 700, y: 432, student: null },
+      { x: 700, y: 524, student: null },
+      { x: 318, y: 257, student: null },
+      { x: 461, y: 257, student: null },
+      { x: 316, y: 402, student: null },
+      { x: 460, y: 402, student: null },
+      { x: 133, y: 521, student: null },
+    ]
+  },
+  "p2: GA1": {
+    roster: [],
+    desks: [
+      { x: 1313, y: 690, student: null },
+      { x: 1171, y: 690, student: null },
+      { x: 1030, y: 690, student: null },
+      { x: 888, y: 690, student: null },
+      { x: 746, y: 690, student: null },
+      { x: 605, y: 690, student: null },
+      { x: 462, y: 690, student: null },
+      { x: 318, y: 690, student: null },
+      { x: 171, y: 690, student: null },
+      { x: 27, y: 688, student: null },
+      { x: 1160, y: 257, student: null },
+      { x: 1304, y: 257, student: null },
+      { x: 1159, y: 402, student: null },
+      { x: 1304, y: 402, student: null },
+      { x: 1160, y: 521, student: null },
+      { x: 920, y: 150, student: null },
+      { x: 920, y: 243, student: null },
+      { x: 920, y: 335, student: null },
+      { x: 920, y: 429, student: null },
+      { x: 920, y: 522, student: null },
+      { x: 700, y: 149, student: null },
+      { x: 700, y: 248, student: null },
+      { x: 700, y: 340, student: null },
+      { x: 700, y: 432, student: null },
+      { x: 700, y: 524, student: null },
+      { x: 318, y: 257, student: null },
+      { x: 461, y: 257, student: null },
+      { x: 316, y: 402, student: null },
+      { x: 460, y: 402, student: null },
+      { x: 133, y: 521, student: null },
+    ]
+  },
+  "p3: HSB27": {
+    roster: ["Juimena Alvarez","Kyeon Aulava Zanzon","Dyanna Bucio Marin","Arianna Cecilio","Nataly Chavez","David Lopez","Alba Lopez Maldonado","Ylianna Luna","Irie Maldonado","Jorge Moreno","Athan Navarro","Natalie Ochoa","Ariana Pinon","Luis Ramos","Isaiah Rios","Rubi Rodriguez","Eric Silva","Rosendo Silva","Kevin Simon Dominguez","Makaila Villanueva"],
+    desks: [
+      { x: 1313, y: 690, student: null },
+      { x: 1171, y: 690, student: null },
+      { x: 1030, y: 690, student: null },
+      { x: 888, y: 690, student: null },
+      { x: 746, y: 690, student: null },
+      { x: 605, y: 690, student: "Dyanna Bucio Marin" },
+      { x: 462, y: 690, student: "Makaila Villanueva" },
+      { x: 318, y: 690, student: null },
+      { x: 171, y: 690, student: null },
+      { x: 27, y: 688, student: null },
+      { x: 1160, y: 257, student: "Natalie Ochoa" },
+      { x: 1304, y: 257, student: "Arianna Cecilio" },
+      { x: 1159, y: 402, student: null },
+      { x: 1304, y: 402, student: "Irie Maldonado" },
+      { x: 1160, y: 521, student: "Jorge Moreno" },
+      { x: 920, y: 150, student: "Alba Lopez Maldonado" },
+      { x: 920, y: 243, student: "Juimena Alvarez" },
+      { x: 920, y: 335, student: "Ylianna Luna" },
+      { x: 920, y: 429, student: null },
+      { x: 920, y: 522, student: "Eric Silva" },
+      { x: 700, y: 149, student: "Kyeon Aulava Zanzon" },
+      { x: 700, y: 248, student: "Isaiah Rios" },
+      { x: 700, y: 340, student: "David Lopez" },
+      { x: 700, y: 432, student: "Athan Navarro" },
+      { x: 700, y: 524, student: null },
+      { x: 318, y: 257, student: null },
+      { x: 461, y: 257, student: null },
+      { x: 316, y: 402, student: null },
+      { x: 460, y: 402, student: "Rubi Rodriguez" },
+      { x: 133, y: 521, student: "Ariana Pinon" },
+    ]
+  },
+  "p4: FrS": {
+    roster: [],
+    desks: [
+      { x: 1313, y: 690, student: null },
+      { x: 1171, y: 690, student: null },
+      { x: 1030, y: 690, student: null },
+      { x: 888, y: 690, student: null },
+      { x: 746, y: 690, student: null },
+      { x: 605, y: 690, student: null },
+      { x: 462, y: 690, student: null },
+      { x: 318, y: 690, student: null },
+      { x: 171, y: 690, student: null },
+      { x: 27, y: 688, student: null },
+      { x: 1160, y: 257, student: null },
+      { x: 1304, y: 257, student: null },
+      { x: 1159, y: 402, student: null },
+      { x: 1304, y: 402, student: null },
+      { x: 1160, y: 521, student: null },
+      { x: 920, y: 150, student: null },
+      { x: 920, y: 243, student: null },
+      { x: 920, y: 335, student: null },
+      { x: 920, y: 429, student: null },
+      { x: 920, y: 522, student: null },
+      { x: 700, y: 149, student: null },
+      { x: 700, y: 248, student: null },
+      { x: 700, y: 340, student: null },
+      { x: 700, y: 432, student: null },
+      { x: 700, y: 524, student: null },
+      { x: 318, y: 257, student: null },
+      { x: 461, y: 257, student: null },
+      { x: 316, y: 402, student: null },
+      { x: 460, y: 402, student: null },
+      { x: 133, y: 521, student: null },
+    ]
+  },
+  "p5: DA1": {
+    roster: [],
+    desks: [
+      { x: 1313, y: 690, student: null },
+      { x: 1171, y: 690, student: null },
+      { x: 1030, y: 690, student: null },
+      { x: 888, y: 690, student: null },
+      { x: 746, y: 690, student: null },
+      { x: 605, y: 690, student: null },
+      { x: 462, y: 690, student: null },
+      { x: 318, y: 690, student: null },
+      { x: 171, y: 690, student: null },
+      { x: 27, y: 688, student: null },
+      { x: 1160, y: 257, student: null },
+      { x: 1304, y: 257, student: null },
+      { x: 1159, y: 402, student: null },
+      { x: 1304, y: 402, student: null },
+      { x: 1160, y: 521, student: null },
+      { x: 920, y: 150, student: null },
+      { x: 920, y: 243, student: null },
+      { x: 920, y: 335, student: null },
+      { x: 920, y: 429, student: null },
+      { x: 920, y: 522, student: null },
+      { x: 700, y: 149, student: null },
+      { x: 700, y: 248, student: null },
+      { x: 700, y: 340, student: null },
+      { x: 700, y: 432, student: null },
+      { x: 700, y: 524, student: null },
+      { x: 318, y: 257, student: null },
+      { x: 461, y: 257, student: null },
+      { x: 316, y: 402, student: null },
+      { x: 460, y: 402, student: null },
+      { x: 133, y: 521, student: null },
+    ]
+  }
+};
+  let state = {
+    classes: [],       // [names]
+    currentClass: null,
+    desks: [],         // {id, x, y, studentId}
+    roster: []         // {id, name}
+  };
+
+  const machineMapping = [
+{"deskNumber":1,"machineName":"HS307L-DG8TJD3"},{"deskNumber":2,"machineName":"HS307L-FTQQZC3"},{"deskNumber":3,"machineName":"HS307L-FTQRZC3"},{"deskNumber":4,"machineName":"HS307L-FTRTZC3"},{"deskNumber":5,"machineName":"HS307L-DG92KD3"},{"deskNumber":6,"machineName":"HS307L-DG8XJD3"},{"deskNumber":7,"machineName":"HS307L-DG93KD3"},{"deskNumber":8,"machineName":"HS307L-FTPRZC3"},{"deskNumber":9,"machineName":"HS307L-DG8ZZC3"},{"deskNumber":10,"machineName":"HS307L-FTNXZC3"},{"deskNumber":11,"machineName":"HS307L-FTSPZC3"},{"deskNumber":12,"machineName":"HS307L-DG95KD3"},{"deskNumber":13,"machineName":"HS307L-DG8VJD3"},{"deskNumber":14,"machineName":"HS307L-FTQPZC3"},{"deskNumber":15,"machineName":"HS307L-FTSSZC3"},{"deskNumber":16,"machineName":"HS307L-FTQNZC3"},{"deskNumber":17,"machineName":"HS307L-DG94KD3"},{"deskNumber":18,"machineName":"HS307L-DG96KD3"},{"deskNumber":19,"machineName":"HS307L-FTPWZC3"},{"deskNumber":20,"machineName":"HS307L-FTSQZC3"},{"deskNumber":21,"machineName":"HS307L-FTRWZC3"},{"deskNumber":22,"machineName":"HS307L-FTRNZC3"},{"deskNumber":23,"machineName":"HS307L-FTNVZC3"},{"deskNumber":24,"machineName":"HS307L-FTPYZC3"},{"deskNumber":25,"machineName":"HS307L-FTQVZC3"},{"deskNumber":26,"machineName":"HS307L-FTSNZC3"},{"deskNumber":27,"machineName":"HS307L-FTPNZC3"},{"deskNumber":28,"machineName":"HS307L-FTSRZC3"},{"deskNumber":29,"machineName":"HS307L-DG9SJD3"},{"deskNumber":30,"machineName":"HS307L-FFTQYZC3"}
+  ];
+
+  let confirmCallback = null;
+
+  function uid(prefix){
+    return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+  function hashRotation(id){
+    let h = 0;
+    for(let i=0;i<id.length;i++){ h = (h*31 + id.charCodeAt(i)) | 0; }
+    return (Math.abs(h) % 5) - 2; // -2..2 deg
+  }
+
+  // ---------- Config -> in-memory state ----------
+  function classFromConfig(cfg){
+    const roster = (cfg.roster || []).map(name => ({id: uid('stu'), name}));
+    const byName = new Map(roster.map(s => [s.name, s.id]));
+    const desks = (cfg.desks || []).map(d => ({
+      id: uid('desk'),
+      x: d.x, y: d.y,
+      studentId: d.student ? (byName.get(d.student) || null) : null
+    }));
+    return {roster, desks};
+  }
+
+  let classDataCache = {};
+
+  // ---------- Data load/save ----------
+  function loadClassesIndex(){
+    let list = Object.keys(CLASS_DATA);
+    if(!list.length){
+      list = ['Period 1'];
+      classDataCache['Period 1'] = {desks: [], roster: []};
+    } else {
+      list.forEach(name => {
+        classDataCache[name] = classFromConfig(CLASS_DATA[name]);
+      });
+    }
+    state.classes = list;
+  }
+
+  function loadClass(name){
+    const data = classDataCache[name] || {desks: [], roster: []};
+    state.currentClass = name;
+    state.desks = data.desks;
+    state.roster = data.roster;
+  }
+
+  function saveClass(){
+    if(!state.currentClass) return;
+    classDataCache[state.currentClass] = {
+      desks: state.desks,
+      roster: state.roster
+    };
+  }
+
+  function saveClassesIndex(){}
+
+  // ---------- Rendering ----------
+  const canvas = document.getElementById('canvas');
+  const classSelect = document.getElementById('classSelect');
+  const rosterList = document.getElementById('rosterList');
+
+  function renderClassSelect(){
+    classSelect.innerHTML = '';
+    state.classes.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      if(name === state.currentClass) opt.selected = true;
+      classSelect.appendChild(opt);
+    });
+  }
+
+  function assignedStudentIds(){
+    return new Set(state.desks.filter(d=>d.studentId).map(d=>d.studentId));
+  }
+
+  function studentById(id){
+    return state.roster.find(s => s.id === id);
+  }
+
+  function renderAll(){
+    renderClassSelect();
+    renderCanvas();
+    renderRoster();
+    renderTitleBlock();
+    document.getElementById('deskCountLabel').textContent =
+      state.desks.length + (state.desks.length === 1 ? ' desk' : ' desks');
+  }
+
+  function renderTitleBlock(){
+    document.getElementById('tbClass').textContent = state.currentClass || '—';
+    const seated = state.desks.filter(d=>d.studentId).length;
+    document.getElementById('tbSeats').textContent = seated + ' / ' + state.desks.length;
+    document.getElementById('tbDate').textContent = new Date().toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'});
+  }
+
+  function renderCanvas(){
+    canvas.querySelectorAll('.desk, .canvas-empty-msg').forEach(el => el.remove());
+
+    if(state.desks.length === 0){
+      const msg = document.createElement('div');
+      msg.className = 'canvas-empty-msg';
+      msg.textContent = 'Click "+ Add Desk" to start building your room layout.';
+      canvas.appendChild(msg);
+    }
+
+    state.desks.forEach((desk, index) => {
+      const el = document.createElement('div');
+      el.className = 'desk';
+      el.style.left = desk.x + 'px';
+      el.style.top = desk.y + 'px';
+      el.dataset.id = desk.id;
+
+      const numberBadge = document.createElement('div');
+      numberBadge.className = 'desk-number';
+      numberBadge.textContent = String(index + 1).padStart(2, '0');
+      el.appendChild(numberBadge);
+
+      const handle = document.createElement('div');
+      handle.className = 'desk-handle';
+      handle.innerHTML = '<span class="desk-dots">⠿</span>';
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'desk-remove';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.title = 'Remove desk';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeDesk(desk.id);
+      });
+      handle.appendChild(removeBtn);
+      el.appendChild(handle);
+
+      const body = document.createElement('div');
+      body.className = 'desk-body';
+
+      const student = desk.studentId ? studentById(desk.studentId) : null;
+
+      if(student){
+        const plate = document.createElement('div');
+        plate.className = 'nameplate';
+        plate.draggable = true;
+        plate.style.transform = 'rotate(' + hashRotation(desk.id) + 'deg)';
+        plate.textContent = student.name;
+        const un = document.createElement('button');
+        un.className = 'unassign';
+        un.innerHTML = '&times;';
+        un.title = 'Unassign';
+        un.addEventListener('click', (e) => {
+          e.stopPropagation();
+          desk.studentId = null;
+          saveClass();
+          renderAll();
+        });
+        plate.appendChild(un);
+        plate.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({studentId: student.id, fromDesk: desk.id}));
+        });
+        body.appendChild(plate);
+      } else {
+        const label = document.createElement('div');
+        label.className = 'desk-empty-label';
+        label.textContent = 'Empty Seat';
+        body.appendChild(label);
+      }
+
+      body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        body.classList.add('drag-over');
+      });
+      body.addEventListener('dragleave', () => body.classList.remove('drag-over'));
+      body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        body.classList.remove('drag-over');
+        let data;
+        try{ data = JSON.parse(e.dataTransfer.getData('text/plain')); }catch(err){ return; }
+        handleDrop(data, desk.id);
+      });
+
+      el.appendChild(body);
+      canvas.appendChild(el);
+
+      wireDeskDrag(handle, body, el, desk);
+    });
+  }
+
+  function handleDrop(data, targetDeskId){
+    const { studentId, fromDesk } = data;
+    if(fromDesk === targetDeskId) return;
+    const targetDesk = state.desks.find(d => d.id === targetDeskId);
+    if(!targetDesk) return;
+    const displacedId = targetDesk.studentId || null;
+    targetDesk.studentId = studentId;
+
+    if(fromDesk){
+      const sourceDesk = state.desks.find(d => d.id === fromDesk);
+      if(sourceDesk) sourceDesk.studentId = displacedId;
+    }
+    saveClass();
+    renderAll();
+  }
+
+  function wireDeskDrag(handle, body, el, desk){
+    function startDrag(e){
+      e.preventDefault();
+      const source = e.currentTarget;
+      source.setPointerCapture(e.pointerId);
+      const startX = e.clientX, startY = e.clientY;
+      const originLeft = desk.x, originTop = desk.y;
+      const maxX = Math.max(canvas.scrollWidth - DESK_W, 0);
+      const maxY = Math.max(canvas.scrollHeight - DESK_H, 0);
+
+      function onMove(ev){
+        const dx = ev.clientX - startX, dy = ev.clientY - startY;
+        let nx = Math.min(Math.max(originLeft + dx, 0), maxX);
+        let ny = Math.min(Math.max(originTop + dy, 0), maxY);
+        el.style.left = nx + 'px';
+        el.style.top = ny + 'px';
+        desk.x = nx; desk.y = ny;
+      }
+      function onUp(){
+        source.removeEventListener('pointermove', onMove);
+        saveClass();
+      }
+      source.addEventListener('pointermove', onMove);
+      source.addEventListener('pointerup', onUp, {once:true});
+      source.addEventListener('pointercancel', onUp, {once:true});
+    }
+
+    handle.addEventListener('pointerdown', (e) => {
+      if(e.target.closest('.desk-remove')) return;
+      startDrag(e);
+    });
+    body.addEventListener('pointerdown', (e) => {
+      if(e.target.closest('.nameplate') || e.target.closest('.unassign')) return;
+      startDrag(e);
+    });
+  }
+
+  function renderRoster(){
+    rosterList.innerHTML = '';
+    const assigned = assignedStudentIds();
+    const unassigned = state.roster.filter(s => !assigned.has(s.id));
+    document.getElementById('unassignedCount').textContent = '(' + unassigned.length + ')';
+
+    if(unassigned.length === 0){
+      const p = document.createElement('div');
+      p.className = 'roster-empty';
+      p.textContent = state.roster.length === 0
+        ? 'Import a roster to get started.'
+        : 'Everyone has a seat.';
+      rosterList.appendChild(p);
+      return;
+    }
+
+    unassigned.forEach(student => {
+      const chip = document.createElement('div');
+      chip.className = 'roster-chip';
+      chip.draggable = true;
+      chip.textContent = student.name;
+      chip.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({studentId: student.id, fromDesk: null}));
+      });
+      rosterList.appendChild(chip);
+    });
+  }
+
+  rosterList.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    rosterList.classList.add('drag-over');
+  });
+  rosterList.addEventListener('dragleave', () => rosterList.classList.remove('drag-over'));
+  rosterList.addEventListener('drop', (e) => {
+    e.preventDefault();
+    rosterList.classList.remove('drag-over');
+    let data;
+    try{ data = JSON.parse(e.dataTransfer.getData('text/plain')); }catch(err){ return; }
+    if(data.fromDesk){
+      const sourceDesk = state.desks.find(d => d.id === data.fromDesk);
+      if(sourceDesk) sourceDesk.studentId = null;
+      saveClass();
+      renderAll();
+    }
+  });
+
+  // ---------- Actions ----------
+  function removeDesk(deskId){
+    state.desks = state.desks.filter(d => d.id !== deskId);
+    saveClass();
+    renderAll();
+  }
+
+  // Generate safe dynamic layouts for user-created rooms
+  function addDesk(){
+    const count = state.desks.length;
+    const col = count % 10;
+    const row = Math.floor(count / 10);
+    const desk = {
+      id: uid('desk'),
+      x: 40 + col * (DESK_W + 20),
+      y: 40 + row * (DESK_H + 30),
+      studentId: null
+    };
+    state.desks.push(desk);
+    saveClass();
+    renderAll();
+  }
+
+  function shuffleSeats(){
+    if(state.desks.length === 0 || state.roster.length === 0) return;
+    const shuffled = [...state.roster];
+    for(let i = shuffled.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i+1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const fillOrder = [...state.desks].reverse();
+    fillOrder.forEach((d, i) => {
+      d.studentId = shuffled[i] ? shuffled[i].id : null;
+    });
+    saveClass();
+    renderAll();
+  }
+
+  function clearSeats(){
+    state.desks.forEach(d => d.studentId = null);
+    saveClass();
+    renderAll();
+  }
+
+  // ---------- Modals ----------
+  function openModal(id){ document.getElementById(id).classList.add('show'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+  function askConfirm(title, text, onOk){
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').textContent = text;
+    confirmCallback = onOk;
+    openModal('confirmModal');
+  }
+
+  document.getElementById('confirmOk').addEventListener('click', () => {
+    closeModal('confirmModal');
+    if(confirmCallback) confirmCallback();
+    confirmCallback = null;
+  });
+  document.getElementById('confirmCancel').addEventListener('click', () => {
+    closeModal('confirmModal');
+    confirmCallback = null;
+  });
+
+  // New class
+  document.getElementById('newClassBtn').addEventListener('click', () => {
+    document.getElementById('newClassInput').value = '';
+    const sel = document.getElementById('copyLayoutSelect');
+    sel.innerHTML = '<option value="">Start empty</option>' +
+      state.classes.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+    openModal('newClassModal');
+    document.getElementById('newClassInput').focus();
+  });
+  document.getElementById('newClassCancel').addEventListener('click', () => closeModal('newClassModal'));
+  document.getElementById('newClassConfirm').addEventListener('click', () => {
+    const name = document.getElementById('newClassInput').value.trim();
+    if(!name) return;
+    if(state.classes.includes(name)){
+      switchClass(name);
+      closeModal('newClassModal');
+      return;
+    }
+    const sourceName = document.getElementById('copyLayoutSelect').value;
+    let desks = [];
+    if(sourceName && classDataCache[sourceName]){
+      desks = classDataCache[sourceName].desks.map(d => ({id: uid('desk'), x: d.x, y: d.y, studentId: null}));
+    }
+    state.classes.push(name);
+    saveClassesIndex();
+    classDataCache[name] = {desks, roster: []};
+    switchClass(name);
+    closeModal('newClassModal');
+  });
+
+  // Duplicate current layout into other classes
+  document.getElementById('duplicateBtn').addEventListener('click', () => {
+    const others = state.classes.filter(c => c !== state.currentClass);
+    const list = document.getElementById('duplicateClassList');
+    list.innerHTML = '';
+    if(others.length === 0){
+      const p = document.createElement('div');
+      p.className = 'roster-empty';
+      p.textContent = 'Create another class first, then you can copy this layout into it.';
+      list.appendChild(p);
+    } else {
+      others.forEach(name => {
+        const label = document.createElement('label');
+        label.className = 'dup-option';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = name;
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(name));
+        list.appendChild(label);
+      });
+    }
+    openModal('duplicateModal');
+  });
+  document.getElementById('duplicateCancel').addEventListener('click', () => closeModal('duplicateModal'));
+  document.getElementById('duplicateConfirm').addEventListener('click', () => {
+    const checked = Array.from(document.querySelectorAll('#duplicateClassList input:checked')).map(i => i.value);
+    closeModal('duplicateModal');
+    if(checked.length === 0) return;
+    checked.forEach(name => {
+      const existing = classDataCache[name] || {desks: [], roster: []};
+      existing.desks = state.desks.map(d => ({id: uid('desk'), x: d.x, y: d.y, studentId: null}));
+      classDataCache[name] = existing;
+    });
+  });
+
+  function switchClass(name){
+    loadClass(name);
+    renderAll();
+  }
+
+  classSelect.addEventListener('change', () => switchClass(classSelect.value));
+
+  // Import roster
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('rosterTextarea').value = state.roster.map(s => s.name).join('\n');
+    openModal('importModal');
+  });
+  document.getElementById('importCancel').addEventListener('click', () => closeModal('importModal'));
+  document.getElementById('importConfirm').addEventListener('click', () => {
+    const lines = document.getElementById('rosterTextarea').value
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    const existingByName = new Map(state.roster.map(s => [s.name.toLowerCase(), s]));
+    const newRoster = lines.map(name => {
+      const existing = existingByName.get(name.toLowerCase());
+      return existing ? existing : {id: uid('stu'), name};
+    });
+    const newIds = new Set(newRoster.map(s => s.id));
+    state.desks.forEach(d => {
+      if(d.studentId && !newIds.has(d.studentId)) d.studentId = null;
+    });
+    state.roster = newRoster;
+    saveClass();
+    renderAll();
+    closeModal('importModal');
+  });
+
+  // Toolbar actions
+  document.getElementById('addDeskBtn').addEventListener('click', addDesk);
+  document.getElementById('shuffleBtn').addEventListener('click', shuffleSeats);
+  document.getElementById('clearSeatsBtn').addEventListener('click', () => {
+    askConfirm('Clear all seats?', 'This unassigns every student for this class. Desks stay in place.', clearSeats);
+  });
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  // FULLSCREEN/PRESENTATION VIEW TOGGLE ACTION
+function reframeForPresentation(){
+    const wrap = document.querySelector('.canvas-wrap');
+    const canvasEl = document.getElementById('canvas');
+
+    canvasEl.style.transform = 'none';
+    canvasEl.style.width = '';
+    canvasEl.style.height = '';
+
+    const viewW = wrap.clientWidth;
+    const viewH = wrap.clientHeight;
+    if(!viewW || !viewH || state.desks.length === 0) return;
+
+    // 1. Set the precise 25px edge padding you requested
+    const margin = 25; 
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    state.desks.forEach(d => {
+      minX = Math.min(minX, d.x);
+      minY = Math.min(minY, d.y);
+      maxX = Math.max(maxX, d.x + DESK_W);
+      maxY = Math.max(maxY, d.y + DESK_H);
+    });
+    
+    // Calculate the raw tight bounding box of just the desks
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+
+    // 2. Compute scale using the viewport size MINUS the 25px padding on both sides (50px total)
+    // Removed the Math.min(1, ...) cap so it can scale UP past 100% if needed
+    const scale = Math.min((viewW - (margin * 2)) / contentW, (viewH - (margin * 2)) / contentH);
+
+    // 3. Determine how much empty canvas space is left over after scaling to center everything
+    const halfPendingW = (viewW / scale - contentW) / 2;
+    const halfPendingH = (viewH / scale - contentH) / 2;
+
+    // 4. Calculate exact canvas dimensions so the background grid never breaks at the screen edges
+    const neededW = Math.max(maxX, minX + (viewW / scale));
+    const neededH = Math.max(maxY, minY + (viewH / scale));
+    
+    canvasEl.style.width = neededW + 'px';
+    canvasEl.style.height = neededH + 'px';
+    canvasEl.style.transformOrigin = '0 0';
+    
+    // 5. Translate perfectly so the bounding box is perfectly centered with exactly 25px gaps
+    const offsetX = minX - halfPendingW;
+    const offsetY = minY - halfPendingH;
+
+    canvasEl.style.transform = 'scale(' + scale + ') translate(' + (-offsetX) + 'px, ' + (-offsetY) + 'px)';
+  }
+
+  function resetCanvasFraming(){
+    const canvasEl = document.getElementById('canvas');
+    canvasEl.style.transform = '';
+    canvasEl.style.width = '';
+    canvasEl.style.height = '';
+  }
+
+  document.getElementById('toggleViewBtn').addEventListener('click', () => {
+    const appWrapper = document.getElementById('appWrapper');
+    const toggleBtn = document.getElementById('toggleViewBtn');
+    const titleBlock = document.getElementById('titleBlock');
+    const workspace = document.querySelector('.workspace');
+    const canvasWrap = document.querySelector('.canvas-wrap');
+    
+    appWrapper.classList.toggle('presentation-mode');
+    
+    if (appWrapper.classList.contains('presentation-mode')) {
+      toggleBtn.textContent = "🛠️ Edit Mode";
+      titleBlock.appendChild(toggleBtn);
+      // Move title block out of the canvas wrap to the top of the workspace view
+      workspace.insertBefore(titleBlock, workspace.firstChild);
+      requestAnimationFrame(reframeForPresentation);
+    } else {
+      toggleBtn.textContent = "📺 Fullscreen View";
+      const toolbar = document.getElementById('mainToolbar');
+      toolbar.insertBefore(toggleBtn, toolbar.querySelector('.spacer')); 
+      // Put the title block back where it originally belongs in edit mode
+      canvasWrap.appendChild(titleBlock);
+      resetCanvasFraming();
+    }
+  });
+
+document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
+  if (!state.desks || state.desks.length === 0) {
+    alert("There are no desks to export!");
+    return;
+  }
+
+  // 1. Get the current active class name dynamically
+  // If somehow empty, fall back to a generic name
+  const rawClassName = state.currentClass || "Classroom";
+
+  // 2. Sanitize the class name for LanSchool's ClassID 
+  // (e.g., "p3: HSB27" becomes "p3_HSB27" by replacing colons/spaces with underscores)
+  const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
+
+  // LanSchool Enhanced Display Format
+  const csvRows = [
+    ['ClassID', 'Student Name', 'Machine Name'] 
+  ];
+
+  // 3. Loop through your desks and pull assigned student information
+  state.desks.forEach((desk, index) => {
+    // Correctly fetch the student object from your active roster using studentId
+    const student = desk.studentId ? studentById(desk.studentId) : null;
+    
+    if (student && student.name) {
+      // Find the computer machine name from your mapping
+      // If none is found, we fall back to a clean placeholder
+      const deskNum = index + 1;
+      const match = machineMapping.find(m => m.deskNumber === deskNum);
+      const machineName = match ? match.machineName : `DESK-${deskNum}`;
+      
+      csvRows.push([
+        classId,
+        student.name.trim(),
+        machineName.trim()
+      ]);
+    }
+  });
+
+  if (csvRows.length <= 1) {
+    alert("No students are currently assigned to any desks!");
+    return;
+  }
+
+  // Convert array to CSV string
+  const csvContent = csvRows
+    .map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+
+  // Trigger browser file download named after your current class
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  
+  // Saves the file cleanly as "p3_HSB27_lanschool.csv"
+  link.setAttribute("download", `${classId}_lanschool.csv`);
+  document.body.appendChild(link);
+  
+  link.click();
+  document.body.removeChild(link);
+});
+
+  // Export Setup
+  function generateConfigCode(){
+    saveClass();
+    const lines = ['const CLASS_DATA = {'];
+    state.classes.forEach((name, i) => {
+      const data = classDataCache[name] || {desks: [], roster: []};
+      lines.push('  ' + JSON.stringify(name) + ': {');
+      lines.push('    roster: ' + JSON.stringify(data.roster.map(s => s.name)) + ',');
+      lines.push('    desks: [');
+      data.desks.forEach(d => {
+        const student = d.studentId ? (data.roster.find(s => s.id === d.studentId) || {}).name : null;
+        lines.push('      { x: ' + Math.round(d.x) + ', y: ' + Math.round(d.y) + ', student: ' + (student ? JSON.stringify(student) : 'null') + ' },');
+      });
+      lines.push('    ]');
+      lines.push('  }' + (i < state.classes.length - 1 ? ',' : ''));
+    });
+    lines.push('};');
+    return lines.join('\n');
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    document.getElementById('exportOutput').value = generateConfigCode();
+    document.getElementById('copyStatus').textContent = '';
+    openModal('exportModal');
+  });
+  document.getElementById('exportClose').addEventListener('click', () => closeModal('exportModal'));
+  document.getElementById('exportCopy').addEventListener('click', async () => {
+    const textarea = document.getElementById('exportOutput');
+    const status = document.getElementById('copyStatus');
+    try{
+      await navigator.clipboard.writeText(textarea.value);
+      status.textContent = 'Copied!';
+    }catch(e){
+      textarea.focus();
+      textarea.select();
+      status.textContent = 'Select-all applied — press Ctrl/Cmd+C to copy.';
+    }
+  });
+
+  // ---------- Init ----------
+  function init(){
+    loadClassesIndex();
+    loadClass(state.classes.includes(state.currentClass) ? state.currentClass : state.classes[0]);
+    renderAll();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
