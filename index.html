@@ -1333,31 +1333,32 @@ document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
       return;
     }
 
+    // 1. Get the class name and sanitize it to make a clean ClassID (e.g., "PERIOD1")
     const rawClassName = state.currentClass || "Classroom";
-    const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
+    const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_').toUpperCase();
 
-    // 1. Start the native LanSchool Class List (.lsc) file structure
+    // 2. Start the native LanSchool Class List (.lsc) file structure
     const lscLines = [
       '[LanSchool Class List]'
     ];
 
     let studentIndex = 0;
 
-    // 2. Loop through and map assigned student names to physical machine names
+    // 3. Loop through and map assigned student names to physical machine names
     state.desks.forEach((desk, index) => {
       const student = desk.studentId ? studentById(desk.studentId) : null;
       
       if (student && student.name) {
-        // Use desk index + 1 to find the matching computer in your machineMapping array
+        // Find the matching computer in your machineMapping array
         const deskNum = index + 1;
         const match = machineMapping.find(m => m.deskNumber === deskNum);
         
         if (match && match.machineName) {
-          const studentName = student.name.trim().toUpperCase();
-          const machineName = match.machineName.trim().toUpperCase();
+          const studentName = student.name.trim();
+          const machineName = match.machineName.trim();
 
-          // LanSchool format: Student_X=STUDENT_NAME=MACHINE_NAME
-          lscLines.push(`Student_${studentIndex}=${studentName}=${machineName}`);
+          // LanSchool format: Student_X=ClassID,Student Name,Machine Name
+          lscLines.push(`Student_${studentIndex}=${classId},${studentName},${machineName}`);
           studentIndex++;
         }
       }
@@ -1368,13 +1369,13 @@ document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
       return;
     }
 
-    // 3. Type=2 specifies "Student Machine Name" matching in LanSchool
-    lscLines.push('Type=2');
+    // 4. Type=1 matches by Machine Name on your network
+    lscLines.push('Type=1');
 
     // Join with standard Windows line endings
     const lscContent = lscLines.join("\r\n");
 
-    // 4. Download directly as a native .lsc file
+    // 5. Download directly as a native .lsc file
     const blob = new Blob([lscContent], { type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
