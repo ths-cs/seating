@@ -1330,49 +1330,57 @@ document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
       return;
     }
 
-    // 1. Get and format the current class name
+    // 1. Get and format the class name
     const rawClassName = state.currentClass || "Classroom";
     const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
 
-    // 2. Generate a clean, localized date (e.g., "July 17, 2026")
+    // 2. Generate dates for metadata and filename
     const today = new Date();
-    const formattedDate = today.toLocaleDateString('en-US', {
+    
+    // Date for metadata (e.g., "July 17, 2026")
+    const formattedDateMeta = today.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
 
+    // Date for filename (e.g., "2026-07-17")
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const formattedDateFilename = `${year}-${month}-${day}`;
+
     // 3. Initialize CSV rows with the Class Name and Date metadata at the top
     const csvRows = [
       [`"Class Name:"`, `"${rawClassName}"`],
-      [`"Date:"`, `"${formattedDate}"`],
-      [], // Empty row for clean spacing
-      ['Station Number', 'Student Name'] // Table headers
+      [`"Date:"`, `"${formattedDateMeta}"`],
+      [], // Empty row for spacing
+      ['Computer', 'Student Name'] // Updated column header
     ];
 
-    // 4. Loop through the desks to map the station number (index + 1) and assigned student
+    // 4. Loop through the desks to map the computer number (index + 1) and assigned student
     state.desks.forEach((desk, index) => {
       const student = desk.studentId ? studentById(desk.studentId) : null;
       
-      // Pad the station number with a leading zero if single-digit (e.g., 01, 02)
-      const stationNumber = String(index + 1).padStart(2, '0');
+      // Pad the computer station number with a leading zero (e.g., 01, 02)
+      const computerNumber = String(index + 1).padStart(2, '0');
       const studentName = student && student.name ? student.name.trim() : "Empty";
 
       // Escape double quotes inside student names to prevent CSV corruption
       const escapedName = studentName.replace(/"/g, '""');
 
-      csvRows.push([`"${stationNumber}"`, `"${escapedName}"`]);
+      csvRows.push([`"${computerNumber}"`, `"${escapedName}"`]);
     });
 
     // 5. Convert the multidimensional array to a standard, comma-separated string
     const csvContent = csvRows.map(row => row.join(',')).join("\r\n");
 
-    // 6. Trigger the automatic browser download
+    // 6. Trigger download with the new file name format: classname_seating_date.csv
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `${classId}_seating_chart.csv`);
+    link.setAttribute("download", `${classId}_seating_${formattedDateFilename}.csv`);
     document.body.appendChild(link);
     
     link.click();
