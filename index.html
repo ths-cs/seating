@@ -500,7 +500,7 @@
     <button class="btn" id="duplicateBtn">Duplicate Layout</button>
     <button class="btn" id="exportBtn">Export Setup</button>
     <button class="btn" id="printBtn">Print</button>
-    <button class="btn" id="exportLanSchoolBtn">💾 Export LanSchool Roster</button>
+    <button class="btn" id="exportLanSchoolBtn">💾 Export to CSV</button>
     <button class="btn" id="toggleViewBtn">📺 Fullscreen View</button>
     <div class="spacer"></div>
     <span class="deskCount" id="deskCountLabel"></span>
@@ -784,9 +784,6 @@ const CLASS_DATA = {
     roster: []         // {id, name}
   };
 
-  const machineMapping = [
-{"deskNumber":1,"machineName":"HS307L-DG8TJD3"},{"deskNumber":2,"machineName":"HS307L-FTQQZC3"},{"deskNumber":3,"machineName":"HS307L-FTQRZC3"},{"deskNumber":4,"machineName":"HS307L-FTRTZC3"},{"deskNumber":5,"machineName":"HS307L-DG92KD3"},{"deskNumber":6,"machineName":"HS307L-DG8XJD3"},{"deskNumber":7,"machineName":"HS307L-DG93KD3"},{"deskNumber":8,"machineName":"HS307L-FTPRZC3"},{"deskNumber":9,"machineName":"HS307L-DG8ZZC3"},{"deskNumber":10,"machineName":"HS307L-FTNXZC3"},{"deskNumber":11,"machineName":"HS307L-FTSPZC3"},{"deskNumber":12,"machineName":"HS307L-DG95KD3"},{"deskNumber":13,"machineName":"HS307L-DG8VJD3"},{"deskNumber":14,"machineName":"HS307L-FTQPZC3"},{"deskNumber":15,"machineName":"HS307L-FTSSZC3"},{"deskNumber":16,"machineName":"HS307L-FTQNZC3"},{"deskNumber":17,"machineName":"HS307L-DG94KD3"},{"deskNumber":18,"machineName":"HS307L-DG96KD3"},{"deskNumber":19,"machineName":"HS307L-FTPWZC3"},{"deskNumber":20,"machineName":"HS307L-FTSQZC3"},{"deskNumber":21,"machineName":"HS307L-FTRWZC3"},{"deskNumber":22,"machineName":"HS307L-FTRNZC3"},{"deskNumber":23,"machineName":"HS307L-FTNVZC3"},{"deskNumber":24,"machineName":"HS307L-FTPYZC3"},{"deskNumber":25,"machineName":"HS307L-FTQVZC3"},{"deskNumber":26,"machineName":"HS307L-FTSNZC3"},{"deskNumber":27,"machineName":"HS307L-FTPNZC3"},{"deskNumber":28,"machineName":"HS307L-FTSRZC3"},{"deskNumber":29,"machineName":"HS307L-DG9SJD3"},{"deskNumber":30,"machineName":"HS307L-FFTQYZC3"}
-  ];
 
   let confirmCallback = null;
 
@@ -1333,54 +1330,49 @@ document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
       return;
     }
 
-    // 1. Get the class name and sanitize it to make a clean ClassID (e.g., "PERIOD1")
+    // 1. Get and format the current class name
     const rawClassName = state.currentClass || "Classroom";
-    const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_').toUpperCase();
+    const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
 
-    // 2. Start the native LanSchool Class List (.lsc) file structure
-    const lscLines = [
-      '[LanSchool Class List]'
+    // 2. Generate a clean, localized date (e.g., "July 17, 2026")
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // 3. Initialize CSV rows with the Class Name and Date metadata at the top
+    const csvRows = [
+      [`"Class Name:"`, `"${rawClassName}"`],
+      [`"Date:"`, `"${formattedDate}"`],
+      [], // Empty row for clean spacing
+      ['Station Number', 'Student Name'] // Table headers
     ];
 
-    let studentIndex = 0;
-
-    // 3. Loop through and map assigned student names to physical machine names
+    // 4. Loop through the desks to map the station number (index + 1) and assigned student
     state.desks.forEach((desk, index) => {
       const student = desk.studentId ? studentById(desk.studentId) : null;
       
-      if (student && student.name) {
-        // Find the matching computer in your machineMapping array
-        const deskNum = index + 1;
-        const match = machineMapping.find(m => m.deskNumber === deskNum);
-        
-        if (match && match.machineName) {
-          const studentName = student.name.trim();
-          const machineName = match.machineName.trim();
+      // Pad the station number with a leading zero if single-digit (e.g., 01, 02)
+      const stationNumber = String(index + 1).padStart(2, '0');
+      const studentName = student && student.name ? student.name.trim() : "Empty";
 
-          // LanSchool format: Student_X=ClassID,Student Name,Machine Name
-          lscLines.push(`Student_${studentIndex}=${classId},${studentName},${machineName}`);
-          studentIndex++;
-        }
-      }
+      // Escape double quotes inside student names to prevent CSV corruption
+      const escapedName = studentName.replace(/"/g, '""');
+
+      csvRows.push([`"${stationNumber}"`, `"${escapedName}"`]);
     });
 
-    if (studentIndex === 0) {
-      alert("No students are currently assigned to any desks!");
-      return;
-    }
+    // 5. Convert the multidimensional array to a standard, comma-separated string
+    const csvContent = csvRows.map(row => row.join(',')).join("\r\n");
 
-    // 4. Type=1 matches by Machine Name on your network
-    lscLines.push('Type=1');
-
-    // Join with standard Windows line endings
-    const lscContent = lscLines.join("\r\n");
-
-    // 5. Download directly as a native .lsc file
-    const blob = new Blob([lscContent], { type: 'text/plain;charset=utf-8;' });
+    // 6. Trigger the automatic browser download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `${classId}.lsc`);
+    link.setAttribute("download", `${classId}_seating_chart.csv`);
     document.body.appendChild(link);
     
     link.click();
