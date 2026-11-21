@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seating Chart</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root{
   --blueprint-bg: #121212;      /* Black — canvas background */
@@ -31,7 +31,7 @@
   html,body { height:100%; }
   body{
     margin:0;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     background: var(--panel-bg);
     color: var(--text-light);
     height:100vh;
@@ -68,7 +68,7 @@
     line-height: 1; /* Prevents the vertical font leading from pushing it down */
   }
   .brand h1{
-    font-family:'Space Grotesk', sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     font-size:24px; font-weight:700; letter-spacing:.01em;
     margin:0; color:var(--text-light);
   }
@@ -80,7 +80,7 @@
     border-radius:6px;
     padding:8px 10px;
     font-size:14px;
-    font-family:'IBM Plex Sans',sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     max-width:180px;
   }
 
@@ -256,11 +256,11 @@
   }
   .nameplate:active{ cursor:grabbing; }
   .np-first{
-    font-family:'Space Grotesk', sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     font-weight:700;
     font-size:20px;
     line-height:1.05;
-    letter-spacing:-.01em;
+    letter-spacing:0;
     max-width:100%;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
@@ -309,7 +309,7 @@
     transition: margin-right 0.2s ease;
   }
   .roster-panel h2{
-    font-family:'Space Grotesk', sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     font-size:14px;
     margin:0 0 12px 0;
     color: var(--text-light);
@@ -428,7 +428,7 @@
     padding:22px;
     width:100%; max-width:420px;
   }
-  .modal h3{ margin:0 0 6px 0; font-family:'Space Grotesk',sans-serif; font-size:17px; }
+  .modal h3{ margin:0 0 6px 0; font-family:'Google Sans Flex', system-ui, sans-serif; font-size:17px; }
   .modal p{ margin:0 0 12px 0; font-size:13px; color: var(--text-muted); }
   .modal textarea, .modal input[type="text"]{
     width:100%;
@@ -437,7 +437,7 @@
     color: var(--text-light);
     border-radius:6px;
     padding:10px;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     font-size:14px;
     resize:vertical;
   }
@@ -449,7 +449,7 @@
     color: var(--text-light);
     border-radius:6px;
     padding:9px 10px;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
     font-size:14px;
   }
   .modal .field-label{
@@ -949,15 +949,6 @@ const CLASS_DATA = {
       handle.className = 'desk-handle';
       handle.innerHTML = '<span class="desk-dots">⠿</span><span class="desk-actions"></span>';
       const actions = handle.querySelector('.desk-actions');
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'desk-remove';
-      removeBtn.innerHTML = '&times;';
-      removeBtn.title = 'Remove desk';
-      removeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        removeDesk(desk.id);
-      });
-      actions.appendChild(removeBtn);
       el.appendChild(handle);
 
       const body = document.createElement('div');
@@ -989,7 +980,7 @@ const CLASS_DATA = {
           saveClass();
           renderAll();
         });
-        actions.insertBefore(un, removeBtn);
+        actions.appendChild(un);
         plate.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', JSON.stringify({studentId: student.id, fromDesk: desk.id}));
         });
