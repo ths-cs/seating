@@ -244,6 +244,26 @@
   }
   .desk-empty-label svg{ display:block; }
 
+  /* Teacher desk: fixed, can't be assigned */
+  .teacher-desk{
+    position:absolute;
+    border-radius:6px;
+    background: var(--tile);
+    box-shadow: inset 0 0 0 2px var(--accent), 0 3px 0 rgba(0,0,0,.55);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px;
+    color: var(--text-muted);
+    pointer-events:none;
+    user-select:none;
+  }
+  .teacher-desk svg{ width:34px; height:34px; }
+  .teacher-desk-label{
+    font-family:'Google Sans Flex', system-ui, sans-serif;
+    font-weight:600;
+    font-size:15px;
+    color: var(--text-light);
+  }
+
   /* Name fills the tile: first name big, rest of name underneath */
   .nameplate{
     width:100%; height:100%;
@@ -513,6 +533,8 @@
     .desk, .desk.occupied{ box-shadow: inset 0 0 0 1px #999; }
     .desk.occupied{ background:#F2F2F2; }
     .desk-handle{ display:none; }
+    .teacher-desk{ box-shadow: inset 0 0 0 2px #555; }
+    .teacher-desk-label{ color:#111; }
     .title-block{ border-color:#999; }
   }
 </style>
@@ -635,6 +657,8 @@ Priya Nair
 <script>
 (function(){
   const DESK_W = 130, DESK_H = 84;
+  // Teacher desk — fixed position, same in every class, never takes a student.
+  const TEACHER_DESK = { x: 133, y: 257, w: 130, h: 229 };
   const MONITOR_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>';
 
   // =====================================================================
@@ -921,7 +945,16 @@ const CLASS_DATA = {
   }
 
   function renderCanvas(){
-    canvas.querySelectorAll('.desk, .canvas-empty-msg').forEach(el => el.remove());
+    canvas.querySelectorAll('.desk, .teacher-desk, .canvas-empty-msg').forEach(el => el.remove());
+
+    const teacher = document.createElement('div');
+    teacher.className = 'teacher-desk';
+    teacher.style.left = TEACHER_DESK.x + 'px';
+    teacher.style.top = TEACHER_DESK.y + 'px';
+    teacher.style.width = TEACHER_DESK.w + 'px';
+    teacher.style.height = TEACHER_DESK.h + 'px';
+    teacher.innerHTML = MONITOR_SVG + '<span class="teacher-desk-label">Teacher Desk</span>';
+    canvas.appendChild(teacher);
 
     if(state.desks.length === 0){
       const msg = document.createElement('div');
@@ -1300,7 +1333,8 @@ function reframeForPresentation(){
 
     // 1. Set the precise 25px edge padding you requested
     const margin = 25; 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = TEACHER_DESK.x, minY = TEACHER_DESK.y,
+        maxX = TEACHER_DESK.x + TEACHER_DESK.w, maxY = TEACHER_DESK.y + TEACHER_DESK.h;
     
     state.desks.forEach(d => {
       minX = Math.min(minX, d.x);
