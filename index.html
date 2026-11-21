@@ -5,10 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seating Chart</title>
 <style>
-  /* 1. Isolated, dedicated load just for Caveat to prevent parsing drops */
-  @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
-  
-  /* 2. Your remaining utility fonts */
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root{
@@ -25,6 +21,10 @@
   --panel-border: #707070;      /* Medium Gray — borders */
   --text-light: #EDEDED;        /* Near-white — text on dark backgrounds */
   --text-muted: #A8A8A8;        /* Medium-light gray — secondary text */
+  --tile: #2B2B2B;              /* Empty desk tile */
+  --tile-edge: #404040;         /* Empty desk outline */
+  --tile-num: #8C8C8C;          /* Station number on an empty desk */
+  --floor: #161616;             /* Room floor */
 }
 
   * { box-sizing: border-box; }
@@ -134,13 +134,9 @@
     min-height:950px;
     width:max-content;
     transition: transform 0.25s ease;
-    background-color: var(--blueprint-bg);
-    background-image:
-      linear-gradient(var(--blueprint-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px),
-      linear-gradient(var(--blueprint-line-strong) 1px, transparent 1px),
-      linear-gradient(90deg, var(--blueprint-line-strong) 1px, transparent 1px);
-    background-size: 25px 25px, 25px 25px, 100px 100px, 100px 100px;
+    background-color: var(--floor);
+    background-image: radial-gradient(circle, #2E2E2E 1px, transparent 1.4px);
+    background-size: 25px 25px;
   }
   .canvas-empty-msg{
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
@@ -159,89 +155,123 @@
     position:absolute;
     width:130px;
     height:84px;
+    border-radius:6px;
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--tile-edge), 0 3px 0 rgba(0,0,0,.55);
   }
-  .desk-number{
-    position:absolute; top:-9px; left:-9px;
-    width:24px; height:24px;
-    border-radius:50%;
+  .desk:hover{ box-shadow: inset 0 0 0 1px var(--text-muted), 0 3px 0 rgba(0,0,0,.55); }
+  .desk.occupied{
+    background: var(--paper);
+    box-shadow: inset 0 0 0 1px #BDBDBD, 0 3px 0 rgba(0,0,0,.55);
+  }
+  .desk.occupied:hover{ box-shadow: inset 0 0 0 2px var(--accent), 0 3px 0 rgba(0,0,0,.55); }
+  .desk.occupied::before{
+    content:'';
+    position:absolute; left:0; top:0; bottom:0;
+    width:6px;
     background: var(--accent);
-    color:#FFFFFF;
-    font-family:'IBM Plex Mono', monospace;
-    font-weight:700;
-    font-size:11.5px;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow:0 2px 4px rgba(0,0,0,.35);
+    border-radius:6px 0 0 6px;
     z-index:2;
     pointer-events:none;
   }
+
+  /* Station number, bottom-right like the Switchboard map */
+  .desk-number{
+    position:absolute; right:7px; bottom:4px;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:500;
+    font-size:14px;
+    color: var(--tile-num);
+    z-index:2;
+    pointer-events:none;
+  }
+  .desk.occupied .desk-number{ color:#7A7A7A; font-size:12px; }
+
+  /* Move/remove strip — appears on hover so the tile stays solid */
   .desk-handle{
-    height:18px;
-    background: var(--blueprint-line-strong);
-    border-radius:5px 5px 0 0;
+    position:absolute; top:0; left:0; right:0;
+    height:20px;
+    background: rgba(18,18,18,.85);
+    border-radius:6px 6px 0 0;
     display:flex; align-items:center; justify-content:space-between;
-    padding:0 5px;
+    padding:0 4px 0 8px;
     cursor:grab;
     touch-action:none;
     user-select:none;
+    opacity:0;
+    transition: opacity .12s ease;
+    z-index:3;
   }
+  .desk:hover .desk-handle, .desk:focus-within .desk-handle{ opacity:1; }
+  @media (hover: none){ .desk-handle{ opacity:1; } }
   .desk-handle:active{ cursor:grabbing; }
   .desk-dots{ color: rgba(255,255,255,0.6); font-size:11px; letter-spacing:1px; }
+  .desk-actions{ display:flex; align-items:center; gap:4px; }
+  .desk-unseat{
+    background:none;
+    border:1px solid #6A6A6A;
+    color:#E0E0E0;
+    font-size:10px;
+    line-height:1;
+    padding:2px 6px;
+    border-radius:3px;
+    cursor:pointer;
+  }
+  .desk-unseat:hover{ background: var(--accent); border-color: var(--accent); color:#fff; }
   .desk-remove{
     background:none; border:none; color: rgba(255,255,255,0.75);
-    font-size:14px; line-height:1; cursor:pointer; padding:0 2px;
+    font-size:15px; line-height:1; cursor:pointer; padding:0 2px;
   }
   .desk-remove:hover{ color:#fff; }
+
   .desk-body{
-    height:66px;
-    border:2px dashed var(--blueprint-line-strong);
-    border-top:none;
-    border-radius:0 0 5px 5px;
+    position:absolute; inset:0;
+    border-radius:6px;
     display:flex; align-items:center; justify-content:center;
-    background: rgba(255,255,255,0.03);
-    transition: background .12s ease, border-color .12s ease;
+    padding:6px 10px 16px 14px;
+    cursor:grab;
+    transition: background .12s ease, box-shadow .12s ease;
+    z-index:1;
   }
   .desk-body.drag-over{
-    background: rgba(232,163,61,0.18);
-    border-color: var(--accent);
+    background: rgba(158,27,50,0.28);
+    box-shadow: inset 0 0 0 2px var(--accent);
   }
   .desk-empty-label{
-    color: var(--blueprint-line-strong);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:10.5px;
-    letter-spacing:.03em;
-    text-align:center;
-    padding:0 8px;
-  }
-  .nameplate{
-    width:112px; height:56px;
-    background: var(--paper);
-    border-radius:4px;
-    box-shadow:0 3px 6px var(--paper-shadow);
+    color:#585858;
     display:flex; align-items:center; justify-content:center;
-    position:relative;
+    pointer-events:none;
+  }
+  .desk-empty-label svg{ display:block; }
+
+  /* Name fills the tile: first name big, rest of name underneath */
+  .nameplate{
+    width:100%; height:100%;
+    display:flex; flex-direction:column; justify-content:center; align-items:flex-start;
+    gap:2px;
     cursor:grab;
-    font-family: 'Caveat', cursive, sans-serif;
-    font-size:20px;
-    font-weight:700;
     color: var(--ink);
-    text-align:center;
-    line-height:1.05;
-    padding:2px 6px;
+    text-align:left;
+    overflow:hidden;
   }
   .nameplate:active{ cursor:grabbing; }
-  .nameplate::before{
-    content:'';
-    position:absolute; top:-5px; left:50%; transform:translateX(-50%);
-    width:8px; height:8px; border-radius:50%;
-    background: var(--accent);
-    box-shadow:0 1px 2px rgba(0,0,0,.4);
+  .np-first{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:20px;
+    line-height:1.05;
+    letter-spacing:-.01em;
+    max-width:100%;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .nameplate .unassign{
-    position:absolute; top:-7px; right:-7px;
-    width:17px; height:17px; border-radius:50%;
-    background: var(--danger); color:#fff; border:2px solid var(--panel-bg);
-    font-size:11px; line-height:1; cursor:pointer; padding:0;
-    font-family:'IBM Plex Sans',sans-serif;
+  .np-last{
+    font-size:12px;
+    font-weight:500;
+    color:#4A4A4A;
+    line-height:1.15;
+    max-width:100%;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden;
   }
 
   /* ---------- Title block ---------- */
@@ -297,12 +327,14 @@
     padding:4px;
     transition: background .12s ease;
   }
-  .roster-list.drag-over{ background: rgba(232,163,61,0.12); }
+  .roster-list.drag-over{ background: rgba(158,27,50,0.18); }
   .roster-chip{
     background: var(--paper);
     color: var(--ink);
     padding:8px 10px;
     border-radius:5px;
+    border-left:5px solid var(--accent);
+    font-weight:500;
     margin-bottom:7px;
     font-size:14px;
     cursor:grab;
@@ -322,6 +354,8 @@
   .app.presentation-mode .roster-panel {
     display: none !important;
   }
+  .app.presentation-mode .desk-handle { display:none; }
+  .app.presentation-mode .desk-body { cursor:default; }
   .app.presentation-mode .workspace {
     position: relative;
     flex-direction: column; /* Stacks the dashboard bar on top of the canvas */
@@ -374,7 +408,7 @@
     margin-top: 0;
     overflow: hidden;
     flex: 1;
-    background-color: var(--blueprint-bg); /* Matches the blueprint grid background */
+    background-color: var(--floor);
   }
 
   /* ---------- Modal ---------- */
@@ -466,16 +500,19 @@
       --blueprint-line-strong:#bcbcbc;
       --paper:#ffffff;
       --panel-bg:#ffffff;
+      --floor:#ffffff;
+      --tile:#ffffff;
+      --tile-edge:#999999;
+      --tile-num:#666666;
     }
     body{ background:#fff; color:#111; overflow:visible; height:auto; }
     .topbar .class-controls, .toolbar, .roster-panel{ display:none !important; }
     .canvas-wrap{ overflow:visible; height:auto; }
     .canvas{ min-width:0; width:100%; box-shadow:none; }
+    .canvas{ background-image:none; }
+    .desk, .desk.occupied{ box-shadow: inset 0 0 0 1px #999; }
+    .desk.occupied{ background:#F2F2F2; }
     .desk-handle{ display:none; }
-    .desk-body{ border-color:#999; }
-    .nameplate{ box-shadow:none; border:1px solid #ccc; }
-    .nameplate .unassign{ display:none; }
-    .nameplate::before{ display:none; }
     .title-block{ border-color:#999; }
   }
 </style>
@@ -598,6 +635,7 @@ Priya Nair
 <script>
 (function(){
   const DESK_W = 130, DESK_H = 84;
+  const MONITOR_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg>';
 
   // =====================================================================
   // YOUR CLASSES — EDIT THIS SECTION TO PERMANENTLY SET YOUR LAYOUTS
@@ -899,6 +937,9 @@ const CLASS_DATA = {
       el.style.top = desk.y + 'px';
       el.dataset.id = desk.id;
 
+      const student = desk.studentId ? studentById(desk.studentId) : null;
+      if(student) el.classList.add('occupied');
+
       const numberBadge = document.createElement('div');
       numberBadge.className = 'desk-number';
       numberBadge.textContent = String(index + 1).padStart(2, '0');
@@ -906,7 +947,8 @@ const CLASS_DATA = {
 
       const handle = document.createElement('div');
       handle.className = 'desk-handle';
-      handle.innerHTML = '<span class="desk-dots">⠿</span>';
+      handle.innerHTML = '<span class="desk-dots">⠿</span><span class="desk-actions"></span>';
+      const actions = handle.querySelector('.desk-actions');
       const removeBtn = document.createElement('button');
       removeBtn.className = 'desk-remove';
       removeBtn.innerHTML = '&times;';
@@ -915,31 +957,39 @@ const CLASS_DATA = {
         e.stopPropagation();
         removeDesk(desk.id);
       });
-      handle.appendChild(removeBtn);
+      actions.appendChild(removeBtn);
       el.appendChild(handle);
 
       const body = document.createElement('div');
       body.className = 'desk-body';
 
-      const student = desk.studentId ? studentById(desk.studentId) : null;
-
       if(student){
         const plate = document.createElement('div');
         plate.className = 'nameplate';
         plate.draggable = true;
-        plate.style.transform = 'rotate(' + hashRotation(desk.id) + 'deg)';
-        plate.textContent = student.name;
+        plate.title = student.name;
+        const parts = student.name.trim().split(/\s+/);
+        const first = document.createElement('span');
+        first.className = 'np-first';
+        first.textContent = parts[0];
+        plate.appendChild(first);
+        if(parts.length > 1){
+          const last = document.createElement('span');
+          last.className = 'np-last';
+          last.textContent = parts.slice(1).join(' ');
+          plate.appendChild(last);
+        }
         const un = document.createElement('button');
-        un.className = 'unassign';
-        un.innerHTML = '&times;';
-        un.title = 'Unassign';
+        un.className = 'desk-unseat';
+        un.textContent = 'Unseat';
+        un.title = 'Move back to the unassigned list';
         un.addEventListener('click', (e) => {
           e.stopPropagation();
           desk.studentId = null;
           saveClass();
           renderAll();
         });
-        plate.appendChild(un);
+        actions.insertBefore(un, removeBtn);
         plate.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', JSON.stringify({studentId: student.id, fromDesk: desk.id}));
         });
@@ -947,7 +997,8 @@ const CLASS_DATA = {
       } else {
         const label = document.createElement('div');
         label.className = 'desk-empty-label';
-        label.textContent = 'Empty Seat';
+        label.title = 'Open seat';
+        label.innerHTML = MONITOR_SVG;
         body.appendChild(label);
       }
 
@@ -1015,7 +1066,7 @@ const CLASS_DATA = {
     }
 
     handle.addEventListener('pointerdown', (e) => {
-      if(e.target.closest('.desk-remove')) return;
+      if(e.target.closest('.desk-remove, .desk-unseat')) return;
       startDrag(e);
     });
     body.addEventListener('pointerdown', (e) => {
