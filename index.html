@@ -568,6 +568,14 @@
     margin-right:10px;
   }
   .save-status.warn{ color:#FFB4A8; }
+  .modal-error{
+    color: var(--danger-text);
+    font-size:12.5px;
+    line-height:1.4;
+    min-height:0;
+    margin-top:8px;
+  }
+  .modal-error:empty{ display:none; }
   .copy-status{
     font-size:12px; color: var(--text-light); margin-right:auto;
     align-self:center;
@@ -651,6 +659,7 @@
     <button class="btn" id="clearRosterBtn">Clear Roster</button>
     <button class="btn" id="duplicateBtn">Duplicate Layout</button>
     <button class="btn" id="exportBtn">Export Setup</button>
+    <button class="btn" id="importSetupBtn">Import Setup</button>
     <button class="btn" id="printBtn">Print</button>
     <button class="btn" id="toggleViewBtn">📺 Fullscreen View</button>
     <div class="spacer"></div>
@@ -723,11 +732,25 @@ Priya Nair
   </div>
 </div>
 
+<!-- Import Setup Modal -->
+<div class="modal-overlay" id="importSetupModal">
+  <div class="modal" style="max-width:560px;">
+    <h3>Import Setup</h3>
+    <p>Paste code copied from <strong>Export Setup</strong>. This replaces every class — desks, rosters, seats and dropped lists — with what's in the code.</p>
+    <textarea class="export-textarea" id="importSetupInput" spellcheck="false" placeholder="const CLASS_DATA = { ... };"></textarea>
+    <div class="modal-error" id="importSetupError" role="alert"></div>
+    <div class="modal-actions">
+      <button class="btn" id="importSetupCancel">Cancel</button>
+      <button class="btn primary" id="importSetupConfirm">Import Setup</button>
+    </div>
+  </div>
+</div>
+
 <!-- Export Setup Modal -->
 <div class="modal-overlay" id="exportModal">
   <div class="modal" style="max-width:560px;">
     <h3>Export Setup</h3>
-    <p>Your changes already save automatically in this browser. Use this to make them permanent in the file itself — for a backup, or to use the chart on another computer or browser. Paste it in place of the <code>CLASS_DATA</code> object near the top of the file's &lt;script&gt; tag (look for the "YOUR CLASSES" comment) and save the file.</p>
+    <p>Your changes already save automatically in this browser. Copy this for a backup, or to move the chart to another computer or browser — there, open the chart and use <strong>Import Setup</strong>. To make it permanent in the file itself, paste it in place of the <code>CLASS_DATA</code> object near the top of the file's &lt;script&gt; tag (look for the "YOUR CLASSES" comment) and save the file.</p>
     <textarea class="export-textarea" id="exportOutput" readonly></textarea>
     <div class="modal-actions">
       <span class="copy-status" id="copyStatus"></span>
@@ -1865,6 +1888,104 @@ function reframeForPresentation(){
     openModal('exportModal');
   });
   document.getElementById('exportClose').addEventListener('click', () => closeModal('exportModal'));
+  // ---------- Import Setup ----------
+  // Turns pasted CLASS_DATA code (a JavaScript object) into plain JSON without running it:
+  // quotes bare keys, converts single-quoted strings, drops comments and trailing commas.
+  function jsObjectToJson(src){
+    let out = '', i = 0;
+    const n = src.length;
+    while(i < n){
+      const c = src[i];
+      if(c === '"' || c === "'"){
+        const q = c; let str = ''; i++;
+        while(i < n && src[i] !== q){
+          if(src[i] === '\\' && i + 1 < n){ str += src[i] + src[i + 1]; i += 2; continue; }
+          str += src[i]; i++;
+        }
+        i++;
+        if(q === "'") str = str.replace(/\\'/g, "'").replace(/"/g, '\\"');
+        out += '"' + str + '"';
+        continue;
+      }
+      if(c === '/' && src[i + 1] === '/'){ while(i < n && src[i] !== '\n') i++; continue; }
+      if(c === '/' && src[i + 1] === '*'){ const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+      if(c === ','){
+        let k = i + 1;
+        while(k < n && /\s/.test(src[k])) k++;
+        if(src[k] === '}' || src[k] === ']'){ i++; continue; }
+      }
+      if(/[A-Za-z_$]/.test(c)){
+        let j = i;
+        while(j < n && /[\w$]/.test(src[j])) j++;
+        const word = src.slice(i, j);
+        let k = j;
+        while(k < n && /\s/.test(src[k])) k++;
+        out += (src[k] === ':' && !['null', 'true', 'false'].includes(word)) ? '"' + word + '"' : word;
+        i = j;
+        continue;
+      }
+      out += c; i++;
+    }
+    return out;
+  }
+
+  function parseSetup(text){
+    const start = text.indexOf('{'), end = text.lastIndexOf('}');
+    if(start < 0 || end <= start) throw new Error("Couldn't find the setup code. Paste everything Export Setup gave you, from “const CLASS_DATA” to the last “};”.");
+    let data;
+    try{ data = JSON.parse(jsObjectToJson(text.slice(start, end + 1))); }
+    catch(e){ throw new Error("The code looks incomplete or was changed by hand. Copy it again from Export Setup and paste the whole thing."); }
+    if(!data || typeof data !== 'object' || Array.isArray(data)) throw new Error("That doesn't look like a seating chart setup.");
+    const names = Object.keys(data);
+    if(!names.length) throw new Error("The setup has no classes in it.");
+    names.forEach(name => {
+      const c = data[name];
+      if(!c || typeof c !== 'object') throw new Error('Class “' + name + '” is missing its details.');
+      if(c.roster != null && (!Array.isArray(c.roster) || c.roster.some(r => typeof r !== 'string')))
+        throw new Error('The roster for “' + name + '” isn’t a list of names.');
+      if(c.dropped != null && (!Array.isArray(c.dropped) || c.dropped.some(r => typeof r !== 'string')))
+        throw new Error('The dropped list for “' + name + '” isn’t a list of names.');
+      if(c.desks != null && (!Array.isArray(c.desks) || c.desks.some(d => !d || typeof d.x !== 'number' || typeof d.y !== 'number')))
+        throw new Error('The desks for “' + name + '” are missing positions.');
+    });
+    return data;
+  }
+
+  const importSetupInput = document.getElementById('importSetupInput');
+  const importSetupError = document.getElementById('importSetupError');
+
+  document.getElementById('importSetupBtn').addEventListener('click', () => {
+    importSetupInput.value = '';
+    importSetupError.textContent = '';
+    openModal('importSetupModal');
+    setTimeout(() => importSetupInput.focus(), 50);
+  });
+  document.getElementById('importSetupCancel').addEventListener('click', () => closeModal('importSetupModal'));
+  importSetupInput.addEventListener('input', () => { importSetupError.textContent = ''; });
+
+  document.getElementById('importSetupConfirm').addEventListener('click', () => {
+    let data;
+    try{ data = parseSetup(importSetupInput.value); }
+    catch(e){ importSetupError.textContent = e.message; return; }
+
+    const names = Object.keys(data);
+    const seated = names.reduce((sum, n) => sum + (data[n].desks || []).filter(d => d.student).length, 0);
+    closeModal('importSetupModal');
+    askConfirm('Replace everything with this setup?',
+      'This loads ' + names.length + (names.length === 1 ? ' class' : ' classes') + ' (' + names.join(', ') + ') with ' +
+      seated + ' seated ' + (seated === 1 ? 'student' : 'students') + ', and replaces all of your current classes. Use Export Setup first if you might want the current version back.',
+      () => {
+        Object.keys(classDataCache).forEach(k => delete classDataCache[k]);
+        names.forEach(n => { classDataCache[n] = classFromConfig(data[n]); });
+        state.classes = names;
+        const keep = names.includes(state.currentClass) ? state.currentClass : names[0];
+        loadClass(keep);
+        renderClassSelect();
+        renderAll();
+        persist();
+      });
+  });
+
   document.getElementById('resetSavedBtn').addEventListener('click', () => {
     closeModal('exportModal');
     askConfirm('Reset to file version?',
