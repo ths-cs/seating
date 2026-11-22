@@ -1035,6 +1035,7 @@ const CLASS_DATA = {
   }
 
   function persist(){
+    publishForGames();
     if(!storageOk) return;
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -2008,7 +2009,26 @@ function reframeForPresentation(){
       status.textContent = 'Select-all applied — press Ctrl/Cmd+C to copy.';
     }
   });
-
+// Publish the chart's classes for the games. The dashboard copies these into a game
+// each time it opens, so every game plays from this chart.
+function publishForGames(){
+  try{
+    const snap = snapshot(), classes = {}, order = [];
+    state.classes.forEach(name => {
+      const cfg = snap[name]; if(!cfg) return;
+      const dropped = new Set(cfg.dropped || []);
+      const desks = (cfg.desks || []).filter(d => typeof d.x === 'number' && typeof d.y === 'number');
+      if(!desks.length || desks.length > 120) return;
+      const layout = desks.map(d => [Math.round(d.x), Math.round(d.y)]);
+      const seats = desks.map(d => (d.student && !dropped.has(d.student)) ? d.student : null);
+      const roster = (cfg.roster || []).filter(n => !dropped.has(n));
+      seats.forEach(n => { if(n && !roster.includes(n)) roster.push(n); });
+      classes[name] = { roster, seats, layout };
+      order.push(name);
+    });
+    localStorage.setItem('dash306-chart', JSON.stringify({ classes, order }));
+  }catch(e){}
+}
   // ---------- Init ----------
   function init(){
     loadClassesIndex();
@@ -2018,6 +2038,7 @@ function reframeForPresentation(){
     else if(!document.getElementById('saveStatus').textContent) setSaveStatus('Changes save automatically');
   }
   init();
+  publishForGames();
   // Re-fit once the web font finishes loading, since it changes name widths.
   if(document.fonts && document.fonts.ready){
     document.fonts.ready.then(fitNames);
