@@ -1459,7 +1459,13 @@ const CLASS_DATA = {
       const j = Math.floor(Math.random() * (i+1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    const fillOrder = [...state.desks].reverse();
+    // Fill from the highest number down (01–10 face the wall, so they fill late),
+    // except the seats in SHUFFLE_LAST, which only fill once everything else is taken.
+    const SHUFFLE_LAST = [30, 10, 01];
+    const numbered = state.desks.map((d, i) => ({desk: d, num: i + 1}));
+    const fillOrder = numbered.filter(x => !SHUFFLE_LAST.includes(x.num)).reverse()
+      .concat(SHUFFLE_LAST.map(n => numbered.find(x => x.num === n)).filter(Boolean))
+      .map(x => x.desk);
     fillOrder.forEach((d, i) => {
       d.studentId = shuffled[i] ? shuffled[i].id : null;
     });
