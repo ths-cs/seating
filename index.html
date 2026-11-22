@@ -1562,6 +1562,7 @@ const CLASS_DATA = {
   // minus room for the title lines). Runs for the Print button and for Ctrl/Cmd+P.
   const PRINT_W = 960, PRINT_H = 600, PRINT_PAD = 6;
   let printFramed = false;
+  let savedScroll = {left: 0, top: 0};
 
   function roomBounds(){
     let minX = TEACHER_DESK.x, minY = TEACHER_DESK.y,
@@ -1591,6 +1592,12 @@ const CLASS_DATA = {
     canvasEl.style.height = b.maxY + 'px';
     canvasEl.style.transformOrigin = '0 0';
     canvasEl.style.transform = 'scale(' + scale + ') translate(' + (-b.minX) + 'px, ' + (-b.minY) + 'px)';
+
+    // The room area keeps its scroll position even when clipped for print,
+    // so scroll it back to the corner or the top/left of the room gets cut off.
+    savedScroll = {left: wrap.scrollLeft, top: wrap.scrollTop};
+    wrap.scrollLeft = 0;
+    wrap.scrollTop = 0;
   }
 
   function unframeAfterPrint(){
@@ -1604,6 +1611,8 @@ const CLASS_DATA = {
     } else {
       wrap.appendChild(document.getElementById('titleBlock'));
       resetCanvasFraming();
+      wrap.scrollLeft = savedScroll.left;
+      wrap.scrollTop = savedScroll.top;
     }
   }
 
