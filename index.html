@@ -1181,6 +1181,20 @@ const CLASS_DATA = {
 
       wireDeskDrag(handle, body, el, desk);
     });
+    fitNames();
+  }
+
+  // Shrink long first names until they fit the desk (down to a readable minimum).
+  const NAME_MIN_PX = 12;
+  function fitNames(){
+    canvas.querySelectorAll('.np-first').forEach(el => {
+      el.style.fontSize = '';
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      while(el.scrollWidth > el.clientWidth && size > NAME_MIN_PX){
+        size = Math.max(NAME_MIN_PX, size - 0.5);
+        el.style.fontSize = size + 'px';
+      }
+    });
   }
 
   function handleDrop(data, targetDeskId){
@@ -1681,6 +1695,11 @@ function reframeForPresentation(){
     const offsetY = minY - halfPendingH;
 
     canvasEl.style.transform = 'scale(' + scale + ') translate(' + (-offsetX) + 'px, ' + (-offsetY) + 'px)';
+
+    // The room area keeps its old scroll position even with scrollbars hidden,
+    // which pushes the edge of the room off-screen. Snap it back to the corner.
+    wrap.scrollLeft = 0;
+    wrap.scrollTop = 0;
   }
 
   function resetCanvasFraming(){
@@ -1708,8 +1727,12 @@ function reframeForPresentation(){
   }
   function inPresentation(){ return document.getElementById('appWrapper').classList.contains('presentation-mode'); }
 
+  let editScroll = {left: 0, top: 0};
+
   function enterPresentation(){
     if(inPresentation()) return;
+    const cw = document.querySelector('.canvas-wrap');
+    editScroll = {left: cw.scrollLeft, top: cw.scrollTop};
     const toggleBtn = document.getElementById('toggleViewBtn');
     const titleBlock = document.getElementById('titleBlock');
     document.getElementById('appWrapper').classList.add('presentation-mode');
@@ -1729,8 +1752,11 @@ function reframeForPresentation(){
     toggleBtn.textContent = "📺 Fullscreen View";
     const toolbar = document.getElementById('mainToolbar');
     toolbar.insertBefore(toggleBtn, toolbar.querySelector('.spacer'));
-    document.querySelector('.canvas-wrap').appendChild(titleBlock);
+    const cw = document.querySelector('.canvas-wrap');
+    cw.appendChild(titleBlock);
     resetCanvasFraming();
+    cw.scrollLeft = editScroll.left;
+    cw.scrollTop = editScroll.top;
     exitFs();
   }
 
@@ -1809,6 +1835,11 @@ function reframeForPresentation(){
     else if(!document.getElementById('saveStatus').textContent) setSaveStatus('Changes save automatically');
   }
   init();
+  // Re-fit once the web font finishes loading, since it changes name widths.
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(fitNames);
+    document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', fitNames);
+  }
 })();
 </script>
 </body>
