@@ -635,6 +635,7 @@
     <button class="btn" id="shuffleBtn">Shuffle Seats</button>
     <button class="btn" id="clearSeatsBtn">Clear Seats</button>
     <button class="btn" id="importBtn">Import Roster</button>
+    <button class="btn" id="clearRosterBtn">Clear Roster</button>
     <button class="btn" id="duplicateBtn">Duplicate Layout</button>
     <button class="btn" id="exportBtn">Export Setup</button>
     <button class="btn" id="printBtn">Print</button>
@@ -814,38 +815,38 @@ const CLASS_DATA = {
     ]
   },
   "p3: HSB27": {
-    roster: ["Juimena Alvarez","Kyeon Aulava Zanzon","Dyanna Bucio Marin","Arianna Cecilio","Nataly Chavez","David Lopez","Alba Lopez Maldonado","Ylianna Luna","Irie Maldonado","Jorge Moreno","Athan Navarro","Natalie Ochoa","Ariana Pinon","Luis Ramos","Isaiah Rios","Rubi Rodriguez","Eric Silva","Rosendo Silva","Kevin Simon Dominguez","Makaila Villanueva"],
+    roster: [],
     desks: [
       { x: 1313, y: 690, student: null },
       { x: 1171, y: 690, student: null },
       { x: 1030, y: 690, student: null },
       { x: 888, y: 690, student: null },
       { x: 746, y: 690, student: null },
-      { x: 605, y: 690, student: "Dyanna Bucio Marin" },
-      { x: 462, y: 690, student: "Makaila Villanueva" },
+      { x: 605, y: 690, student: null },
+      { x: 462, y: 690, student: null },
       { x: 318, y: 690, student: null },
       { x: 171, y: 690, student: null },
       { x: 27, y: 688, student: null },
-      { x: 1160, y: 257, student: "Natalie Ochoa" },
-      { x: 1304, y: 257, student: "Arianna Cecilio" },
+      { x: 1160, y: 257, student: null },
+      { x: 1304, y: 257, student: null },
       { x: 1159, y: 402, student: null },
-      { x: 1304, y: 402, student: "Irie Maldonado" },
-      { x: 1160, y: 521, student: "Jorge Moreno" },
-      { x: 920, y: 150, student: "Alba Lopez Maldonado" },
-      { x: 920, y: 243, student: "Juimena Alvarez" },
-      { x: 920, y: 335, student: "Ylianna Luna" },
+      { x: 1304, y: 402, student: null },
+      { x: 1160, y: 521, student: null },
+      { x: 920, y: 150, student: null },
+      { x: 920, y: 243, student: null },
+      { x: 920, y: 335, student: null },
       { x: 920, y: 429, student: null },
-      { x: 920, y: 522, student: "Eric Silva" },
-      { x: 700, y: 149, student: "Kyeon Aulava Zanzon" },
-      { x: 700, y: 248, student: "Isaiah Rios" },
-      { x: 700, y: 340, student: "David Lopez" },
-      { x: 700, y: 432, student: "Athan Navarro" },
+      { x: 920, y: 522, student: null },
+      { x: 700, y: 149, student: null },
+      { x: 700, y: 248, student: null },
+      { x: 700, y: 340, student: null },
+      { x: 700, y: 432, student: null },
       { x: 700, y: 524, student: null },
       { x: 318, y: 257, student: null },
       { x: 461, y: 257, student: null },
       { x: 316, y: 402, student: null },
-      { x: 460, y: 402, student: "Rubi Rodriguez" },
-      { x: 133, y: 521, student: "Ariana Pinon" },
+      { x: 460, y: 402, student: null },
+      { x: 133, y: 521, student: null },
     ]
   },
   "p4: FrS": {
@@ -1555,6 +1556,17 @@ const CLASS_DATA = {
   document.getElementById('shuffleBtn').addEventListener('click', shuffleSeats);
   document.getElementById('clearSeatsBtn').addEventListener('click', () => {
     askConfirm('Clear all seats?', 'This unassigns every student for this class. Desks stay in place.', clearSeats);
+  });
+  document.getElementById('clearRosterBtn').addEventListener('click', () => {
+    if(state.roster.length === 0) return;
+    askConfirm('Clear roster for ' + state.currentClass + '?',
+      'This removes all ' + state.roster.length + ' students from this class and empties their seats. Desks stay in place, and other classes are not affected.',
+      () => {
+        state.desks.forEach(d => d.studentId = null);
+        state.roster = [];
+        saveClass();
+        renderAll();
+      });
   });
   document.getElementById('printBtn').addEventListener('click', () => window.print());
 
