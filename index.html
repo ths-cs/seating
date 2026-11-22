@@ -350,7 +350,7 @@
     color: var(--text-light);
     display:flex; align-items:center; gap:6px;
   }
-  #unassignedCount{
+  #unassignedCount, #droppedCount{
     font-family:'IBM Plex Mono', monospace;
     font-size:11px;
     color: var(--text-muted);
@@ -376,6 +376,19 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .roster-chip:active{ cursor:grabbing; }
+  .dropped-section{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid var(--panel-border);
+  }
+  .roster-chip.dropped{
+    background: var(--tile);
+    color: var(--text-muted);
+    border-left-color: #6A6A6A;
+    box-shadow:none;
+    font-weight:400;
+  }
+  .dropped-list.drag-over{ background: rgba(255,255,255,0.06); }
   .nameplate, .roster-chip{ touch-action:none; user-select:none; -webkit-user-select:none; }
   .drag-source{ opacity:.35; }
   body.name-dragging, body.name-dragging *{ cursor:grabbing !important; }
@@ -658,6 +671,10 @@
     <aside class="roster-panel">
       <h2>Unassigned <span id="unassignedCount"></span></h2>
       <div class="roster-list" id="rosterList"></div>
+      <div class="dropped-section" id="droppedSection">
+        <h2>Dropped <span id="droppedCount"></span></h2>
+        <div class="roster-list dropped-list" id="droppedList"></div>
+      </div>
     </aside>
   </div>
 </div>
@@ -681,7 +698,7 @@
 <div class="modal-overlay" id="importModal">
   <div class="modal">
     <h3>Import Roster</h3>
-    <p>One student name per line. This replaces the current roster for this class — students removed here will be unseated.</p>
+    <p>One student name per line. This replaces the current roster for this class — students removed here will be unseated. Dropped students stay in the Dropped list unless you add their name here.</p>
     <textarea id="rosterTextarea" placeholder="Alicia Chen
 Marcus Reed
 Priya Nair
@@ -942,7 +959,12 @@ const CLASS_DATA = {
 
   // ---------- Config -> in-memory state ----------
   function classFromConfig(cfg){
-    const roster = (cfg.roster || []).map(name => ({id: uid('stu'), name}));
+    const droppedNames = new Set(cfg.dropped || []);
+    const roster = (cfg.roster || []).map(name => {
+      const s = {id: uid('stu'), name};
+      if(droppedNames.has(name)) s.dropped = true;
+      return s;
+    });
     const byName = new Map(roster.map(s => [s.name, s.id]));
     const desks = (cfg.desks || []).map(d => ({
       id: uid('desk'),
@@ -973,6 +995,7 @@ const CLASS_DATA = {
       const data = classDataCache[name] || {desks: [], roster: []};
       out[name] = {
         roster: data.roster.map(s => s.name),
+        dropped: data.roster.filter(s => s.dropped).map(s => s.name),
         desks: data.desks.map(d => {
           const st = d.studentId ? data.roster.find(s => s.id === d.studentId) : null;
           return { x: Math.round(d.x), y: Math.round(d.y), student: st ? st.name : null };
@@ -1252,28 +1275,47 @@ const CLASS_DATA = {
     });
   }
 
+  const droppedList = document.getElementById('droppedList');
+
   function renderRoster(){
     rosterList.innerHTML = '';
+    droppedList.innerHTML = '';
     const assigned = assignedStudentIds();
-    const unassigned = state.roster.filter(s => !assigned.has(s.id));
+    const active = state.roster.filter(s => !s.dropped);
+    const dropped = state.roster.filter(s => s.dropped);
+    const unassigned = active.filter(s => !assigned.has(s.id));
     document.getElementById('unassignedCount').textContent = '(' + unassigned.length + ')';
+    document.getElementById('droppedCount').textContent = '(' + dropped.length + ')';
 
     if(unassigned.length === 0){
       const p = document.createElement('div');
       p.className = 'roster-empty';
-      p.textContent = state.roster.length === 0
+      p.textContent = active.length === 0
         ? 'Import a roster to get started.'
         : 'Everyone has a seat.';
       rosterList.appendChild(p);
-      return;
     }
-
     unassigned.forEach(student => {
       const chip = document.createElement('div');
       chip.className = 'roster-chip';
       chip.textContent = student.name;
       makeNameDraggable(chip, student.id, null, student.name);
       rosterList.appendChild(chip);
+    });
+
+    if(dropped.length === 0){
+      const p = document.createElement('div');
+      p.className = 'roster-empty';
+      p.textContent = 'Drag a student here if they drop the class.';
+      droppedList.appendChild(p);
+    }
+    dropped.forEach(student => {
+      const chip = document.createElement('div');
+      chip.className = 'roster-chip dropped';
+      chip.textContent = student.name;
+      chip.title = 'Dropped — drag back to Unassigned or onto a desk to restore';
+      makeNameDraggable(chip, student.id, null, student.name);
+      droppedList.appendChild(chip);
     });
   }
 
@@ -1328,6 +1370,7 @@ const CLASS_DATA = {
     if(hit){
       const body = hit.closest('.desk-body');
       if(body) target = body;
+      else if(hit.closest('#droppedSection')) target = droppedList;
       else if(hit.closest('.roster-panel')) target = rosterList;
     }
     if(target === d.target) return;
@@ -1358,16 +1401,20 @@ const CLASS_DATA = {
     const wasActive = d.active, target = d.target;
     endNameDrag();
     if(!wasActive || !target) return;
-    if(target === rosterList){
-      if(d.fromDesk){
-        const sourceDesk = state.desks.find(x => x.id === d.fromDesk);
-        if(sourceDesk) sourceDesk.studentId = null;
-        saveClass();
-        renderAll();
-      }
+    const student = studentById(d.studentId);
+    if(!student) return;
+    if(target === rosterList || target === droppedList){
+      student.dropped = (target === droppedList) || undefined;
+      if(!student.dropped) delete student.dropped;
+      // Make sure they're not still sitting at a desk
+      state.desks.forEach(x => { if(x.studentId === student.id) x.studentId = null; });
+      saveClass();
+      renderAll();
     } else {
       const deskEl = target.closest('.desk');
-      if(deskEl) handleDrop({studentId: d.studentId, fromDesk: d.fromDesk}, deskEl.dataset.id);
+      if(!deskEl) return;
+      delete student.dropped; // seating a dropped student restores them
+      handleDrop({studentId: d.studentId, fromDesk: d.fromDesk}, deskEl.dataset.id);
     }
   }
 
@@ -1406,8 +1453,8 @@ const CLASS_DATA = {
   }
 
   function shuffleSeats(){
-    if(state.desks.length === 0 || state.roster.length === 0) return;
-    const shuffled = [...state.roster];
+    const shuffled = state.roster.filter(s => !s.dropped);
+    if(state.desks.length === 0 || shuffled.length === 0) return;
     for(let i = shuffled.length - 1; i > 0; i--){
       const j = Math.floor(Math.random() * (i+1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
@@ -1524,7 +1571,7 @@ const CLASS_DATA = {
 
   // Import roster
   document.getElementById('importBtn').addEventListener('click', () => {
-    document.getElementById('rosterTextarea').value = state.roster.map(s => s.name).join('\n');
+    document.getElementById('rosterTextarea').value = state.roster.filter(s => !s.dropped).map(s => s.name).join('\n');
     openModal('importModal');
   });
   document.getElementById('importCancel').addEventListener('click', () => closeModal('importModal'));
@@ -1535,15 +1582,22 @@ const CLASS_DATA = {
       .filter(Boolean);
 
     const existingByName = new Map(state.roster.map(s => [s.name.toLowerCase(), s]));
-    const newRoster = lines.map(name => {
-      const existing = existingByName.get(name.toLowerCase());
-      return existing ? existing : {id: uid('stu'), name};
+    const seen = new Set();
+    const newRoster = [];
+    lines.forEach(name => {
+      const key = name.toLowerCase();
+      if(seen.has(key)) return;
+      seen.add(key);
+      const existing = existingByName.get(key);
+      if(existing){ delete existing.dropped; newRoster.push(existing); } // listing a dropped student restores them
+      else newRoster.push({id: uid('stu'), name});
     });
     const newIds = new Set(newRoster.map(s => s.id));
+    const keptDropped = state.roster.filter(s => s.dropped && !newIds.has(s.id));
     state.desks.forEach(d => {
       if(d.studentId && !newIds.has(d.studentId)) d.studentId = null;
     });
-    state.roster = newRoster;
+    state.roster = newRoster.concat(keptDropped);
     saveClass();
     renderAll();
     closeModal('importModal');
@@ -1574,7 +1628,7 @@ const CLASS_DATA = {
   document.getElementById('clearRosterBtn').addEventListener('click', () => {
     if(state.roster.length === 0) return;
     askConfirm('Clear roster for ' + state.currentClass + '?',
-      'This removes all ' + state.roster.length + ' students from this class and empties their seats. Desks stay in place, and other classes are not affected.',
+      'This removes all ' + state.roster.length + ' students from this class (including the Dropped list) and empties their seats. Desks stay in place, and other classes are not affected.',
       () => {
         state.desks.forEach(d => d.studentId = null);
         state.roster = [];
@@ -1785,6 +1839,7 @@ function reframeForPresentation(){
       const data = classDataCache[name] || {desks: [], roster: []};
       lines.push('  ' + JSON.stringify(name) + ': {');
       lines.push('    roster: ' + JSON.stringify(data.roster.map(s => s.name)) + ',');
+      lines.push('    dropped: ' + JSON.stringify(data.roster.filter(s => s.dropped).map(s => s.name)) + ',');
       lines.push('    desks: [');
       data.desks.forEach(d => {
         const student = d.studentId ? (data.roster.find(s => s.id === d.studentId) || {}).name : null;
