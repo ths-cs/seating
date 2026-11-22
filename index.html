@@ -25,6 +25,8 @@
   --tile-edge: #404040;         /* Empty desk outline */
   --tile-num: #8C8C8C;          /* Station number on an empty desk */
   --floor: #161616;             /* Room floor */
+  --field-bg: #1C1C1C;          /* Text boxes and lists inside pop-ups */
+  --danger-text: #F2B8C2;       /* Light crimson — text on destructive buttons */
 }
 
   * { box-sizing: border-box; }
@@ -98,7 +100,8 @@
   .btn:hover{ border-color: var(--accent); }
   .btn.primary{ background: var(--accent); border-color: var(--accent); color:#FFFFFF; font-weight:600; }
   .btn.primary:hover{ background: var(--accent-dark); border-color: var(--accent-dark); }
-  .btn.danger{ color:#FFD9CC; }
+  .btn.danger{ color: var(--danger-text); border-color: var(--accent); }
+  .btn.danger:hover{ background: var(--accent); color:#FFFFFF; }
   .btn.danger:hover{ border-color: var(--danger); }
   .btn.active{ background: var(--accent); border-color: var(--accent); color: #FFF; }
 
@@ -244,6 +247,18 @@
   }
   .desk-empty-label svg{ display:block; }
 
+  /* Locked layout: desks can't move, but Unseat still works */
+  .app.layout-locked .desk-body{ cursor:default; }
+  .app.layout-locked .desk-handle{ cursor:default; justify-content:flex-end; }
+  .app.layout-locked .desk-dots{ display:none; }
+  .app.layout-locked #addDeskBtn, .app.layout-locked #duplicateBtn{ display:none; }
+  .app.layout-locked .desk:not(.occupied) .desk-handle{ display:none; }
+  .app.layout-locked .desk:not(.occupied):hover{ box-shadow: inset 0 0 0 1px var(--tile-edge), 0 3px 0 rgba(0,0,0,.55); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn:disabled:hover{ border-color: var(--panel-border); }
+  .btn.primary:disabled:hover{ background: var(--accent); border-color: var(--accent); }
+  #lockBtn.unlocked{ border-color: var(--accent); color: var(--danger-text); }
+
   /* Teacher desk: fixed, can't be assigned */
   .teacher-desk{
     position:absolute;
@@ -361,6 +376,25 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .roster-chip:active{ cursor:grabbing; }
+  .nameplate, .roster-chip{ touch-action:none; user-select:none; -webkit-user-select:none; }
+  .drag-source{ opacity:.35; }
+  body.name-dragging, body.name-dragging *{ cursor:grabbing !important; }
+  .drag-ghost{
+    position:fixed;
+    z-index:1000;
+    pointer-events:none;
+    transform: translate(-50%, -50%) rotate(-3deg);
+    background: var(--paper);
+    color: var(--ink);
+    border-left:5px solid var(--accent);
+    border-radius:5px;
+    padding:9px 12px;
+    font-family:'Google Sans Flex', system-ui, sans-serif;
+    font-weight:600;
+    font-size:15px;
+    white-space:nowrap;
+    box-shadow:0 10px 24px rgba(0,0,0,.5);
+  }
   .roster-empty{
     color: var(--text-muted);
     font-size:12.5px;
@@ -435,7 +469,9 @@
   .modal-overlay{
     display:none;
     position:fixed; inset:0;
-    background: rgba(10,20,32,0.65);
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     align-items:center; justify-content:center;
     z-index:50;
     padding:20px;
@@ -444,15 +480,25 @@
   .modal{
     background: var(--panel-bg);
     border:1px solid var(--panel-border);
+    border-top:4px solid var(--accent);
     border-radius:10px;
     padding:22px;
     width:100%; max-width:420px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);
+  }
+  .modal p code{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    background: var(--field-bg);
+    color: var(--text-light);
+    padding:1px 5px;
+    border-radius:3px;
   }
   .modal h3{ margin:0 0 6px 0; font-family:'Google Sans Flex', system-ui, sans-serif; font-size:17px; }
   .modal p{ margin:0 0 12px 0; font-size:13px; color: var(--text-muted); }
   .modal textarea, .modal input[type="text"]{
     width:100%;
-    background:#0F2438;
+    background: var(--field-bg);
     border:1px solid var(--panel-border);
     color: var(--text-light);
     border-radius:6px;
@@ -464,7 +510,7 @@
   .modal textarea{ min-height:160px; line-height:1.5; }
   .modal select{
     width:100%;
-    background:#0F2438;
+    background: var(--field-bg);
     border:1px solid var(--panel-border);
     color: var(--text-light);
     border-radius:6px;
@@ -472,6 +518,11 @@
     font-family:'Google Sans Flex', system-ui, sans-serif;
     font-size:14px;
   }
+  .modal textarea:focus, .modal input[type="text"]:focus, .modal select:focus, .export-textarea:focus{
+    border-color: var(--accent);
+    outline:none;
+  }
+  .modal ::placeholder{ color:#6E6E6E; }
   .modal .field-label{
     display:block; margin:12px 0 6px; font-size:12px; color: var(--text-muted);
   }
@@ -479,13 +530,15 @@
   .dup-list{ display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; }
   .dup-option{
     display:flex; align-items:center; gap:8px;
-    background:#0F2438; border:1px solid var(--panel-border);
+    background: var(--field-bg); border:1px solid var(--panel-border);
     border-radius:6px; padding:8px 10px; font-size:14px; cursor:pointer;
   }
-  .dup-option input{ cursor:pointer; }
-  .export-textarea{
+  .dup-option:hover{ border-color: var(--text-muted); }
+  .dup-option:has(input:checked){ border-color: var(--accent); background: rgba(158,27,50,.18); }
+  .dup-option input{ cursor:pointer; accent-color: var(--accent); }
+  .modal .export-textarea{
     width:100%; min-height:220px;
-    background:#0F2438;
+    background: var(--field-bg);
     border:1px solid var(--panel-border);
     color: var(--text-light);
     border-radius:6px;
@@ -496,8 +549,14 @@
     white-space:pre;
     resize:vertical;
   }
+  .save-status{
+    font-size:12px;
+    color: var(--text-muted);
+    margin-right:10px;
+  }
+  .save-status.warn{ color:#FFB4A8; }
   .copy-status{
-    font-size:12px; color: var(--accent); margin-right:auto;
+    font-size:12px; color: var(--text-light); margin-right:auto;
     align-self:center;
   }
 
@@ -512,12 +571,10 @@
     * { transition:none !important; }
   }
 
-  /* ---------- Print ---------- */
+  /* ---------- Print: whole room on one landscape page ---------- */
+  @page{ size: letter landscape; margin: 0.4in; }
   @media print{
     :root{
-      --blueprint-bg:#ffffff;
-      --blueprint-line:#e2e2e2;
-      --blueprint-line-strong:#bcbcbc;
       --paper:#ffffff;
       --panel-bg:#ffffff;
       --floor:#ffffff;
@@ -525,22 +582,41 @@
       --tile-edge:#999999;
       --tile-num:#666666;
     }
-    body{ background:#fff; color:#111; overflow:visible; height:auto; }
-    .topbar .class-controls, .toolbar, .roster-panel{ display:none !important; }
-    .canvas-wrap{ overflow:visible; height:auto; }
-    .canvas{ min-width:0; width:100%; box-shadow:none; }
-    .canvas{ background-image:none; }
+    *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html, body{ background:#fff; color:#111; overflow:visible; height:auto; }
+    body, .app, .workspace{ display:block !important; height:auto !important; }
+    .topbar{ background:none; border:none; padding:0 0 6px; }
+    .topbar .class-controls, .toolbar, .roster-panel, .modal-overlay{ display:none !important; }
+    .app.presentation-mode .topbar{ display:flex !important; }
+    .brand h1{ color:#111; }
+
+    /* Class / seated / date as a single line under the title */
+    .title-block, .app.presentation-mode .title-block{
+      position:static !important;
+      display:flex !important; gap:28px; align-items:center;
+      width:auto; min-width:0;
+      background:none !important;
+      border:none !important; border-bottom:1px solid #999 !important;
+      border-radius:0;
+      box-shadow:none !important;
+      padding:0 0 6px !important;
+      margin:0 0 12px;
+    }
+    .title-block .tb-row{ font-size:13px; gap:8px; }
+    .title-block .btn{ display:none !important; }
+
+    .canvas-wrap, .app.presentation-mode .canvas-wrap{ overflow:hidden !important; flex:none; background:#fff; margin:0 auto; }
+    .canvas{ min-width:0 !important; min-height:0 !important; background:#fff !important; transition:none !important; }
     .desk, .desk.occupied{ box-shadow: inset 0 0 0 1px #999; }
     .desk.occupied{ background:#F2F2F2; }
-    .desk-handle{ display:none; }
+    .desk-handle, .drag-ghost{ display:none !important; }
     .teacher-desk{ box-shadow: inset 0 0 0 2px #555; }
     .teacher-desk-label{ color:#111; }
-    .title-block{ border-color:#999; }
   }
 </style>
 </head>
 <body>
-<div class="app" id="appWrapper">
+<div class="app layout-locked" id="appWrapper">
 
   <header class="topbar">
     <div class="brand">
@@ -554,6 +630,7 @@
   </header>
 
   <div class="toolbar" id="mainToolbar">
+    <button class="btn" id="lockBtn" aria-pressed="true" title="Unlock to move or add desks">🔒 Layout Locked</button>
     <button class="btn primary" id="addDeskBtn">+ Add Desk</button>
     <button class="btn" id="shuffleBtn">Shuffle Seats</button>
     <button class="btn" id="clearSeatsBtn">Clear Seats</button>
@@ -561,9 +638,9 @@
     <button class="btn" id="duplicateBtn">Duplicate Layout</button>
     <button class="btn" id="exportBtn">Export Setup</button>
     <button class="btn" id="printBtn">Print</button>
-    <button class="btn" id="exportLanSchoolBtn">💾 Export to CSV</button>
     <button class="btn" id="toggleViewBtn">📺 Fullscreen View</button>
     <div class="spacer"></div>
+    <span class="save-status" id="saveStatus" aria-live="polite"></span>
     <span class="deskCount" id="deskCountLabel"></span>
   </div>
 
@@ -632,10 +709,11 @@ Priya Nair
 <div class="modal-overlay" id="exportModal">
   <div class="modal" style="max-width:560px;">
     <h3>Export Setup</h3>
-    <p>Copy this and paste it in place of the <code>CLASS_DATA</code> object near the top of the file's &lt;script&gt; tag (look for the "YOUR CLASSES" comment). Save the file, and this layout and roster become the permanent starting point — no storage or hosting needed.</p>
+    <p>Your changes already save automatically in this browser. Use this to make them permanent in the file itself — for a backup, or to use the chart on another computer or browser. Paste it in place of the <code>CLASS_DATA</code> object near the top of the file's &lt;script&gt; tag (look for the "YOUR CLASSES" comment) and save the file.</p>
     <textarea class="export-textarea" id="exportOutput" readonly></textarea>
     <div class="modal-actions">
       <span class="copy-status" id="copyStatus"></span>
+      <button class="btn danger" id="resetSavedBtn" title="Throw away browser-saved changes and go back to what's written in the file">Reset to File Version</button>
       <button class="btn" id="exportClose">Close</button>
       <button class="btn primary" id="exportCopy">Copy to Clipboard</button>
     </div>
@@ -850,6 +928,7 @@ const CLASS_DATA = {
 
 
   let confirmCallback = null;
+  let layoutLocked = true; // desks can't be moved or added until unlocked
 
   function uid(prefix){
     return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -875,7 +954,79 @@ const CLASS_DATA = {
   let classDataCache = {};
 
   // ---------- Data load/save ----------
+  // ---------- Auto-save (browser storage) ----------
+  // Every change is kept in this browser. If CLASS_DATA in the file is edited
+  // later, the file wins and the saved copy is set aside.
+  const STORAGE_KEY = 'seatingChart306';
+  const FILE_FINGERPRINT = (function(){
+    const str = JSON.stringify(CLASS_DATA);
+    let h = 0;
+    for(let i = 0; i < str.length; i++){ h = (h * 31 + str.charCodeAt(i)) | 0; }
+    return String(h);
+  })();
+  let storageOk = true;
+
+  function snapshot(){
+    const out = {};
+    state.classes.forEach(name => {
+      const data = classDataCache[name] || {desks: [], roster: []};
+      out[name] = {
+        roster: data.roster.map(s => s.name),
+        desks: data.desks.map(d => {
+          const st = d.studentId ? data.roster.find(s => s.id === d.studentId) : null;
+          return { x: Math.round(d.x), y: Math.round(d.y), student: st ? st.name : null };
+        })
+      };
+    });
+    return out;
+  }
+
+  function setSaveStatus(text, warn){
+    const el = document.getElementById('saveStatus');
+    el.textContent = text;
+    el.classList.toggle('warn', !!warn);
+  }
+
+  function persist(){
+    if(!storageOk) return;
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        fingerprint: FILE_FINGERPRINT,
+        currentClass: state.currentClass,
+        classes: snapshot()
+      }));
+      const t = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+      setSaveStatus('✓ Saved ' + t);
+    }catch(e){
+      storageOk = false;
+      setSaveStatus('⚠ Not saving — use Export Setup to keep changes', true);
+    }
+  }
+
+  function readSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return null;
+      const saved = JSON.parse(raw);
+      if(!saved || saved.fingerprint !== FILE_FINGERPRINT || !saved.classes) return null;
+      if(!Object.keys(saved.classes).length) return null;
+      return saved;
+    }catch(e){
+      storageOk = false;
+      return null;
+    }
+  }
+
   function loadClassesIndex(){
+    const saved = readSaved();
+    if(saved){
+      const names = Object.keys(saved.classes);
+      names.forEach(name => { classDataCache[name] = classFromConfig(saved.classes[name]); });
+      state.classes = names;
+      state.currentClass = saved.currentClass;
+      setSaveStatus('✓ Restored saved changes');
+      return;
+    }
     let list = Object.keys(CLASS_DATA);
     if(!list.length){
       list = ['Period 1'];
@@ -901,6 +1052,7 @@ const CLASS_DATA = {
       desks: state.desks,
       roster: state.roster
     };
+    persist();
   }
 
   function saveClassesIndex(){}
@@ -990,7 +1142,6 @@ const CLASS_DATA = {
       if(student){
         const plate = document.createElement('div');
         plate.className = 'nameplate';
-        plate.draggable = true;
         plate.title = student.name;
         const parts = student.name.trim().split(/\s+/);
         const first = document.createElement('span');
@@ -1014,9 +1165,7 @@ const CLASS_DATA = {
           renderAll();
         });
         actions.appendChild(un);
-        plate.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', JSON.stringify({studentId: student.id, fromDesk: desk.id}));
-        });
+        makeNameDraggable(plate, student.id, desk.id, student.name);
         body.appendChild(plate);
       } else {
         const label = document.createElement('div');
@@ -1025,19 +1174,6 @@ const CLASS_DATA = {
         label.innerHTML = MONITOR_SVG;
         body.appendChild(label);
       }
-
-      body.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        body.classList.add('drag-over');
-      });
-      body.addEventListener('dragleave', () => body.classList.remove('drag-over'));
-      body.addEventListener('drop', (e) => {
-        e.preventDefault();
-        body.classList.remove('drag-over');
-        let data;
-        try{ data = JSON.parse(e.dataTransfer.getData('text/plain')); }catch(err){ return; }
-        handleDrop(data, desk.id);
-      });
 
       el.appendChild(body);
       canvas.appendChild(el);
@@ -1090,10 +1226,12 @@ const CLASS_DATA = {
     }
 
     handle.addEventListener('pointerdown', (e) => {
+      if(layoutLocked) return;
       if(e.target.closest('.desk-remove, .desk-unseat')) return;
       startDrag(e);
     });
     body.addEventListener('pointerdown', (e) => {
+      if(layoutLocked) return;
       if(e.target.closest('.nameplate') || e.target.closest('.unassign')) return;
       startDrag(e);
     });
@@ -1118,32 +1256,116 @@ const CLASS_DATA = {
     unassigned.forEach(student => {
       const chip = document.createElement('div');
       chip.className = 'roster-chip';
-      chip.draggable = true;
       chip.textContent = student.name;
-      chip.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({studentId: student.id, fromDesk: null}));
-      });
+      makeNameDraggable(chip, student.id, null, student.name);
       rosterList.appendChild(chip);
     });
   }
 
-  rosterList.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    rosterList.classList.add('drag-over');
-  });
-  rosterList.addEventListener('dragleave', () => rosterList.classList.remove('drag-over'));
-  rosterList.addEventListener('drop', (e) => {
-    e.preventDefault();
-    rosterList.classList.remove('drag-over');
-    let data;
-    try{ data = JSON.parse(e.dataTransfer.getData('text/plain')); }catch(err){ return; }
-    if(data.fromDesk){
-      const sourceDesk = state.desks.find(d => d.id === data.fromDesk);
-      if(sourceDesk) sourceDesk.studentId = null;
-      saveClass();
-      renderAll();
+  // ---------- Name dragging (works with mouse, pen and touch) ----------
+  const DRAG_THRESHOLD = 6;   // px of movement before a press becomes a drag
+  const EDGE = 48;            // px from the canvas edge where auto-scroll kicks in
+  const canvasWrap = document.querySelector('.canvas-wrap');
+  const rosterPanel = document.querySelector('.roster-panel');
+  let nameDrag = null;
+
+  function makeNameDraggable(el, studentId, fromDesk, label){
+    el.addEventListener('pointerdown', (e) => {
+      if(e.button !== 0 || e.target.closest('button')) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      nameDrag = {
+        studentId, fromDesk, label, source: el, pointerId: e.pointerId,
+        startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY,
+        active: false, ghost: null, target: null, raf: null
+      };
+    });
+    el.addEventListener('pointermove', onNameMove);
+    el.addEventListener('pointerup', onNameUp);
+    el.addEventListener('pointercancel', endNameDrag);
+    el.addEventListener('lostpointercapture', () => { if(nameDrag && nameDrag.source === el) endNameDrag(); });
+  }
+
+  function onNameMove(e){
+    const d = nameDrag;
+    if(!d || e.pointerId !== d.pointerId) return;
+    d.x = e.clientX; d.y = e.clientY;
+    if(!d.active){
+      if(Math.hypot(d.x - d.startX, d.y - d.startY) < DRAG_THRESHOLD) return;
+      d.active = true;
+      d.ghost = document.createElement('div');
+      d.ghost.className = 'drag-ghost';
+      d.ghost.textContent = d.label;
+      document.body.appendChild(d.ghost);
+      d.source.classList.add('drag-source');
+      document.body.classList.add('name-dragging');
+      d.raf = requestAnimationFrame(autoScroll);
     }
-  });
+    d.ghost.style.left = d.x + 'px';
+    d.ghost.style.top = d.y + 'px';
+    updateDropTarget();
+  }
+
+  function updateDropTarget(){
+    const d = nameDrag;
+    const hit = document.elementFromPoint(d.x, d.y);
+    let target = null;
+    if(hit){
+      const body = hit.closest('.desk-body');
+      if(body) target = body;
+      else if(hit.closest('.roster-panel')) target = rosterList;
+    }
+    if(target === d.target) return;
+    if(d.target) d.target.classList.remove('drag-over');
+    if(target) target.classList.add('drag-over');
+    d.target = target;
+  }
+
+  function autoScroll(){
+    const d = nameDrag;
+    if(!d || !d.active) return;
+    const r = canvasWrap.getBoundingClientRect();
+    if(d.x >= r.left && d.x <= r.right && d.y >= r.top && d.y <= r.bottom){
+      const speed = (dist) => Math.ceil((EDGE - dist) / 4);
+      let dx = 0, dy = 0;
+      if(d.x - r.left < EDGE) dx = -speed(d.x - r.left);
+      else if(r.right - d.x < EDGE) dx = speed(r.right - d.x);
+      if(d.y - r.top < EDGE) dy = -speed(d.y - r.top);
+      else if(r.bottom - d.y < EDGE) dy = speed(r.bottom - d.y);
+      if(dx || dy){ canvasWrap.scrollLeft += dx; canvasWrap.scrollTop += dy; updateDropTarget(); }
+    }
+    d.raf = requestAnimationFrame(autoScroll);
+  }
+
+  function onNameUp(e){
+    const d = nameDrag;
+    if(!d || e.pointerId !== d.pointerId) return;
+    const wasActive = d.active, target = d.target;
+    endNameDrag();
+    if(!wasActive || !target) return;
+    if(target === rosterList){
+      if(d.fromDesk){
+        const sourceDesk = state.desks.find(x => x.id === d.fromDesk);
+        if(sourceDesk) sourceDesk.studentId = null;
+        saveClass();
+        renderAll();
+      }
+    } else {
+      const deskEl = target.closest('.desk');
+      if(deskEl) handleDrop({studentId: d.studentId, fromDesk: d.fromDesk}, deskEl.dataset.id);
+    }
+  }
+
+  function endNameDrag(){
+    const d = nameDrag;
+    if(!d) return;
+    nameDrag = null;
+    if(d.raf) cancelAnimationFrame(d.raf);
+    if(d.ghost) d.ghost.remove();
+    if(d.target) d.target.classList.remove('drag-over');
+    d.source.classList.remove('drag-source');
+    document.body.classList.remove('name-dragging');
+  }
 
   // ---------- Actions ----------
   function removeDesk(deskId){
@@ -1274,11 +1496,13 @@ const CLASS_DATA = {
       existing.desks = state.desks.map(d => ({id: uid('desk'), x: d.x, y: d.y, studentId: null}));
       classDataCache[name] = existing;
     });
+    persist();
   });
 
   function switchClass(name){
     loadClass(name);
     renderAll();
+    persist();
   }
 
   classSelect.addEventListener('change', () => switchClass(classSelect.value));
@@ -1310,13 +1534,81 @@ const CLASS_DATA = {
     closeModal('importModal');
   });
 
+  // Layout lock
+  function applyLock(){
+    const btn = document.getElementById('lockBtn');
+    document.getElementById('appWrapper').classList.toggle('layout-locked', layoutLocked);
+    btn.classList.toggle('unlocked', !layoutLocked);
+    btn.setAttribute('aria-pressed', String(layoutLocked));
+    btn.textContent = layoutLocked ? '🔒 Layout Locked' : '🔓 Layout Unlocked';
+    btn.title = layoutLocked ? 'Unlock to move or add desks' : 'Lock to keep desks in place';
+    document.getElementById('addDeskBtn').disabled = layoutLocked;
+  }
+  document.getElementById('lockBtn').addEventListener('click', () => {
+    layoutLocked = !layoutLocked;
+    applyLock();
+  });
+  applyLock();
+
   // Toolbar actions
-  document.getElementById('addDeskBtn').addEventListener('click', addDesk);
+  document.getElementById('addDeskBtn').addEventListener('click', () => { if(!layoutLocked) addDesk(); });
   document.getElementById('shuffleBtn').addEventListener('click', shuffleSeats);
   document.getElementById('clearSeatsBtn').addEventListener('click', () => {
     askConfirm('Clear all seats?', 'This unassigns every student for this class. Desks stay in place.', clearSeats);
   });
   document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  // Fit the whole room onto one landscape page (Letter, 0.4in margins = ~970 x 740 px,
+  // minus room for the title lines). Runs for the Print button and for Ctrl/Cmd+P.
+  const PRINT_W = 960, PRINT_H = 600, PRINT_PAD = 6;
+  let printFramed = false;
+
+  function roomBounds(){
+    let minX = TEACHER_DESK.x, minY = TEACHER_DESK.y,
+        maxX = TEACHER_DESK.x + TEACHER_DESK.w, maxY = TEACHER_DESK.y + TEACHER_DESK.h;
+    state.desks.forEach(d => {
+      minX = Math.min(minX, d.x); minY = Math.min(minY, d.y);
+      maxX = Math.max(maxX, d.x + DESK_W); maxY = Math.max(maxY, d.y + DESK_H + 3);
+    });
+    return {minX: minX - PRINT_PAD, minY: minY - PRINT_PAD, maxX: maxX + PRINT_PAD, maxY: maxY + PRINT_PAD};
+  }
+
+  function frameForPrint(){
+    if(printFramed) return;
+    printFramed = true;
+    const wrap = document.querySelector('.canvas-wrap');
+    const canvasEl = document.getElementById('canvas');
+    const titleBlock = document.getElementById('titleBlock');
+    const b = roomBounds();
+    const w = b.maxX - b.minX, h = b.maxY - b.minY;
+    const scale = Math.min(PRINT_W / w, PRINT_H / h);
+
+    // Title line goes above the room
+    wrap.parentNode.insertBefore(titleBlock, wrap);
+    wrap.style.width = (w * scale) + 'px';
+    wrap.style.height = (h * scale) + 'px';
+    canvasEl.style.width = b.maxX + 'px';
+    canvasEl.style.height = b.maxY + 'px';
+    canvasEl.style.transformOrigin = '0 0';
+    canvasEl.style.transform = 'scale(' + scale + ') translate(' + (-b.minX) + 'px, ' + (-b.minY) + 'px)';
+  }
+
+  function unframeAfterPrint(){
+    if(!printFramed) return;
+    printFramed = false;
+    const wrap = document.querySelector('.canvas-wrap');
+    wrap.style.width = '';
+    wrap.style.height = '';
+    if(inPresentation()){
+      reframeForPresentation(); // title block already lives above the room in this view
+    } else {
+      wrap.appendChild(document.getElementById('titleBlock'));
+      resetCanvasFraming();
+    }
+  }
+
+  window.addEventListener('beforeprint', frameForPrint);
+  window.addEventListener('afterprint', unframeAfterPrint);
 
   // FULLSCREEN/PRESENTATION VIEW TOGGLE ACTION
 function reframeForPresentation(){
@@ -1377,92 +1669,65 @@ function reframeForPresentation(){
     canvasEl.style.height = '';
   }
 
-  document.getElementById('toggleViewBtn').addEventListener('click', () => {
-    const appWrapper = document.getElementById('appWrapper');
+  // Presentation view also asks the browser for real fullscreen (hides tabs and address bar).
+  function fsElement(){ return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function requestFs(){
+    const el = document.documentElement;
+    try{
+      const r = el.requestFullscreen ? el.requestFullscreen() : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
+      if(r && r.catch) r.catch(() => {}); // blocked or unsupported: the in-page view still works
+    }catch(e){}
+  }
+  function exitFs(){
+    if(!fsElement()) return;
+    try{
+      const r = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen ? document.webkitExitFullscreen() : null);
+      if(r && r.catch) r.catch(() => {});
+    }catch(e){}
+  }
+  function inPresentation(){ return document.getElementById('appWrapper').classList.contains('presentation-mode'); }
+
+  function enterPresentation(){
+    if(inPresentation()) return;
     const toggleBtn = document.getElementById('toggleViewBtn');
     const titleBlock = document.getElementById('titleBlock');
-    const workspace = document.querySelector('.workspace');
-    const canvasWrap = document.querySelector('.canvas-wrap');
-    
-    appWrapper.classList.toggle('presentation-mode');
-    
-    if (appWrapper.classList.contains('presentation-mode')) {
-      toggleBtn.textContent = "🛠️ Edit Mode";
-      titleBlock.appendChild(toggleBtn);
-      // Move title block out of the canvas wrap to the top of the workspace view
-      workspace.insertBefore(titleBlock, workspace.firstChild);
-      requestAnimationFrame(reframeForPresentation);
-    } else {
-      toggleBtn.textContent = "📺 Fullscreen View";
-      const toolbar = document.getElementById('mainToolbar');
-      toolbar.insertBefore(toggleBtn, toolbar.querySelector('.spacer')); 
-      // Put the title block back where it originally belongs in edit mode
-      canvasWrap.appendChild(titleBlock);
-      resetCanvasFraming();
-    }
+    document.getElementById('appWrapper').classList.add('presentation-mode');
+    toggleBtn.textContent = "🛠️ Edit Mode";
+    titleBlock.appendChild(toggleBtn);
+    const ws = document.querySelector('.workspace');
+    ws.insertBefore(titleBlock, ws.firstChild);
+    requestFs();
+    requestAnimationFrame(reframeForPresentation);
+  }
+
+  function exitPresentation(){
+    if(!inPresentation()) return;
+    const toggleBtn = document.getElementById('toggleViewBtn');
+    const titleBlock = document.getElementById('titleBlock');
+    document.getElementById('appWrapper').classList.remove('presentation-mode');
+    toggleBtn.textContent = "📺 Fullscreen View";
+    const toolbar = document.getElementById('mainToolbar');
+    toolbar.insertBefore(toggleBtn, toolbar.querySelector('.spacer'));
+    document.querySelector('.canvas-wrap').appendChild(titleBlock);
+    resetCanvasFraming();
+    exitFs();
+  }
+
+  document.getElementById('toggleViewBtn').addEventListener('click', () => {
+    inPresentation() ? exitPresentation() : enterPresentation();
   });
 
-document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
-    if (!state.desks || state.desks.length === 0) {
-      alert("There are no desks to export!");
-      return;
-    }
+  // Pressing Esc leaves browser fullscreen — take that as "back to Edit Mode" too.
+  function onFsChange(){ if(!fsElement() && inPresentation()) exitPresentation(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
 
-    // 1. Get and format the class name
-    const rawClassName = state.currentClass || "Classroom";
-    const classId = rawClassName.replace(/[^a-zA-Z0-9]/g, '_').replace(/__+/g, '_');
-
-    // 2. Generate dates for metadata and filename
-    const today = new Date();
-    
-    // Date for metadata (e.g., "July 17, 2026")
-    const formattedDateMeta = today.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Date for filename (e.g., "2026-07-17")
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const formattedDateFilename = `${year}-${month}-${day}`;
-
-    // 3. Initialize CSV rows with the Class Name and Date metadata at the top
-    const csvRows = [
-      [`"Class Name:"`, `"${rawClassName}"`],
-      [`"Date:"`, `"${formattedDateMeta}"`],
-      [], // Empty row for spacing
-      ['Computer', 'Student Name'] // Updated column header
-    ];
-
-    // 4. Loop through the desks to map the computer number (index + 1) and assigned student
-    state.desks.forEach((desk, index) => {
-      const student = desk.studentId ? studentById(desk.studentId) : null;
-      
-      // Pad the computer station number with a leading zero (e.g., 01, 02)
-      const computerNumber = String(index + 1).padStart(2, '0');
-      const studentName = student && student.name ? student.name.trim() : "Empty";
-
-      // Escape double quotes inside student names to prevent CSV corruption
-      const escapedName = studentName.replace(/"/g, '""');
-
-      csvRows.push([`"${computerNumber}"`, `"${escapedName}"`]);
-    });
-
-    // 5. Convert the multidimensional array to a standard, comma-separated string
-    const csvContent = csvRows.map(row => row.join(',')).join("\r\n");
-
-    // 6. Trigger download with the new file name format: classname_seating_date.csv
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${classId}_seating_${formattedDateFilename}.csv`);
-    document.body.appendChild(link);
-    
-    link.click();
-    document.body.removeChild(link);
+  // Re-fit the room whenever the screen size changes while presenting.
+  let reframeTimer = null;
+  window.addEventListener('resize', () => {
+    if(!inPresentation()) return;
+    clearTimeout(reframeTimer);
+    reframeTimer = setTimeout(reframeForPresentation, 60);
   });
 
   // Export Setup
@@ -1491,6 +1756,16 @@ document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
     openModal('exportModal');
   });
   document.getElementById('exportClose').addEventListener('click', () => closeModal('exportModal'));
+  document.getElementById('resetSavedBtn').addEventListener('click', () => {
+    closeModal('exportModal');
+    askConfirm('Reset to file version?',
+      'This throws away every change saved in this browser and goes back to the layout and rosters written in the file. Copy your setup first if you might want it back.',
+      () => {
+        storageOk = false; // stop anything re-saving before the reload
+        try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+        location.reload();
+      });
+  });
   document.getElementById('exportCopy').addEventListener('click', async () => {
     const textarea = document.getElementById('exportOutput');
     const status = document.getElementById('copyStatus');
@@ -1509,6 +1784,8 @@ document.getElementById('exportLanSchoolBtn').addEventListener('click', () => {
     loadClassesIndex();
     loadClass(state.classes.includes(state.currentClass) ? state.currentClass : state.classes[0]);
     renderAll();
+    if(!storageOk) setSaveStatus('⚠ Not saving — use Export Setup to keep changes', true);
+    else if(!document.getElementById('saveStatus').textContent) setSaveStatus('Changes save automatically');
   }
   init();
 })();
